@@ -230,6 +230,9 @@
     <h2>Gaps worth moving on today</h2>
     <div id="d-gaps"></div>
 
+    <h2>Out on tour right now</h2>
+    <div id="d-tour"></div>
+
     <h2>Last movements</h2>
     <div id="d-moves"></div>
 
@@ -840,6 +843,26 @@ function renderDash() {
     });
   });
   document.getElementById('d-gaps').innerHTML = gaps || '<p class="note">No stock gaps at selling sites right now.</p>';
+
+  /* out on tour */
+  var tl = DB.onTour || [];
+  var tEl = document.getElementById('d-tour');
+  if (tEl) {
+    if (!tl.length) tEl.innerHTML = '<p class="note">Nothing out \u2014 all bikes are home.</p>';
+    else {
+      var byG = {};
+      tl.forEach(function(t){ (byG[t.guide || '?'] = byG[t.guide || '?'] || []).push(t); });
+      var th2 = '';
+      Object.keys(byG).sort().forEach(function(g){
+        var items = byG[g];
+        var d0 = new Date(items[0].when), since = '';
+        if (!isNaN(d0)) since = ' \u00b7 since ' + ('0'+d0.getHours()).slice(-2) + ':' + ('0'+d0.getMinutes()).slice(-2);
+        th2 += '<div class="move"><b>' + g + '</b> \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') + since +
+               '<div class="meta">' + items.map(function(t){ return t.assetId; }).join(' \u00b7 ') + '</div></div>';
+      });
+      tEl.innerHTML = th2;
+    }
+  }
 
   /* last movements */
   var mv = '';
