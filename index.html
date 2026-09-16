@@ -560,6 +560,9 @@ function onCode(code) {
   } else if (mode === 'tour-out' || mode === 'tour-in') {
     var dir = mode === 'tour-out' ? 'out' : 'in';
     TOUR_CALL({ barcode: code, dir: dir, user: user }, function(r){
+      if (!r || r.error || !r.assetId && !r.notFound && !r.blocked) {
+        toast('Server is running old code \u2014 redeploy Code.gs (New version)', true); go('home'); return;
+      }
       if (r.notFound) { toast('No bike carries ' + code + ' \u2014 assign it first', true); go(mode); return; }
       if (r.blocked) { toast(r.assetId + ' is ' + r.status + ' \u2014 not tour-ready', true); go(mode); return; }
       if (r.already) { toast(r.assetId + ' is already out', true); go(mode); return; }
