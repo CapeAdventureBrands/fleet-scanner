@@ -90,6 +90,7 @@
   .pill.ready { background:#E2F1E6; color:var(--ok); }
   .pill.oos { background:#FBE3E4; color:var(--red); }
   .pill.wait { background:#FBF3DC; color:#8A6510; }
+  .pill.tour { background:#E3ECFA; color:#1D5FBF; }
   .hist-title { font-size:11px; letter-spacing:.06em; color:var(--grey); font-weight:600; text-transform:uppercase; margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
   .hist { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
   .hist .d { color:var(--grey); font-size:12px; min-width:74px; }
@@ -136,12 +137,31 @@
     <div class="chips" id="people"></div>
   </section>
 
+  <!-- SIDE LANDING -->
+  <section id="view-side" class="hidden">
+    <h2>What are you here for?</h2>
+    <div class="tiles">
+      <button class="tile" onclick="chooseSide('guide')">
+        <div class="big">Guide</div>
+        <div class="sub">Look up &amp; move bikes, take bikes on tour</div>
+      </button>
+      <button class="tile" onclick="chooseSide('office')">
+        <div class="big">Office / Admin</div>
+        <div class="sub">Dashboard, workshop, reports, barcodes</div>
+      </button>
+    </div>
+  </section>
+
   <!-- HOME -->
   <section id="view-home" class="hidden">
     <div class="tiles">
-      <button class="tile" onclick="go('lookup')">
+      <button class="tile" onclick="go('lookup')" id="tile-lookup">
         <div class="big">Look up &amp; move</div>
         <div class="sub">Scan a bike — check it, move it, report a fault</div>
+      </button>
+      <button class="tile" onclick="go('tour')" id="tile-tour">
+        <div class="big">Tour bikes</div>
+        <div class="sub">Scan bikes out for your tour &mdash; and back in after</div>
       </button>
       <button class="tile" onclick="requireRole('workshop','workshop')" id="tile-workshop">
         <div class="big">Log workshop work <span class="lock">&#128274;</span></div>
@@ -150,6 +170,10 @@
       <button class="tile" onclick="requireRole('admin','dash')" id="tile-dash">
         <div class="big">Location dashboard <span class="lock">&#128274;</span></div>
         <div class="sub">Live counts by site and status</div>
+      </button>
+      <button class="tile" onclick="requireRole('admin','report')" id="tile-report">
+        <div class="big">Workshop report <span class="lock">&#128274;</span></div>
+        <div class="sub">Jobs done, minutes, services &mdash; by day and by tech</div>
       </button>
       <button class="tile" onclick="requireRole('admin','assign')" id="tile-assign">
         <div class="big">Assign barcodes <span class="lock">&#128274;</span></div>
@@ -252,6 +276,43 @@
     </div>
   </section>
 
+  <!-- WORKSHOP REPORT -->
+  <section id="view-report" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Workshop report</h2>
+    <div class="chips" id="r-period"></div>
+    <div class="card" style="margin-top:12px">
+      <div class="facts">
+        <div class="fact"><div class="v" id="r-jobs"></div><div class="k">Jobs</div></div>
+        <div class="fact"><div class="v" id="r-mins"></div><div class="k">Minutes</div></div>
+        <div class="fact"><div class="v" id="r-serv"></div><div class="k">Services</div></div>
+        <div class="fact"><div class="v" id="r-bikes"></div><div class="k">Bikes touched</div></div>
+      </div>
+    </div>
+    <h2>By tech</h2>
+    <div id="r-techs"></div>
+    <h2>Job list</h2>
+    <div id="r-list"></div>
+  </section>
+
+  <!-- TOUR HUB -->
+  <section id="view-tour" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Tour bikes</h2>
+    <div class="tiles">
+      <button class="tile" onclick="go('tour-out')">
+        <div class="big">Scan bikes OUT</div>
+        <div class="sub">Taking them on tour now</div>
+      </button>
+      <button class="tile" onclick="go('tour-in')">
+        <div class="big">Scan bikes BACK IN</div>
+        <div class="sub">Tour finished &mdash; checking them in</div>
+      </button>
+    </div>
+    <h2>Out on tour right now</h2>
+    <div id="t-out"></div>
+  </section>
+
   <!-- LOOKUP: bike card -->
   <section id="view-bike" class="hidden">
     <button class="back" onclick="go('lookup')">‹ Scan another</button>
@@ -297,6 +358,27 @@ var DB = { bikes: [], locations: [], statuses: [], people: [] };
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
+var side = localStorage.getItem('cab_side') || '';
+function chooseSide(s) {
+  side = s;
+  localStorage.setItem('cab_side', s);
+  go('home');
+}
+function paintSide_() {
+  var showOffice = side === 'office';
+  var vis = {
+    'tile-lookup': true,
+    'tile-tour': side !== 'office',
+    'tile-workshop': showOffice,
+    'tile-dash': showOffice,
+    'tile-report': showOffice,
+    'tile-assign': showOffice
+  };
+  for (var id in vis) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = vis[id] ? '' : 'none';
+  }
+}
 function roleRank_(r){ return r === 'admin' ? 2 : r === 'workshop' ? 1 : 0; }
 function requireRole(need, view) {
   if (roleRank_(role) >= roleRank_(need)) { go(view); return; }
@@ -314,14 +396,24 @@ function requireRole(need, view) {
 }
 function paintRoles_() {
   var w = document.getElementById('tile-workshop'), d = document.getElementById('tile-dash'),
-      a = document.getElementById('tile-assign');
+      a = document.getElementById('tile-assign'), rp = document.getElementById('tile-report');
+  if (rp) rp.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
   if (w) w.className = 'tile' + (roleRank_(role) >= 1 ? ' open' : '');
   if (d) d.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
   if (a) a.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
   var n = document.getElementById('role-note');
-  if (n) n.innerHTML = role === 'guide' ? 'Guide access &middot; locked tiles need a PIN'
-    : (role === 'workshop' ? 'Workshop access' : 'Management access') +
-      ' &middot; <a href="#" onclick="lockDown();return false">lock</a>';
+  if (n) {
+    var base = side === 'guide' ? 'Guide'
+      : role === 'guide' ? 'Office &middot; locked tiles need a PIN'
+      : role === 'workshop' ? 'Workshop access &middot; <a href="#" onclick="lockDown();return false">lock</a>'
+      : 'Management access &middot; <a href="#" onclick="lockDown();return false">lock</a>';
+    n.innerHTML = base + ' &middot; <a href="#" onclick="switchSide();return false">switch</a>';
+  }
+}
+function switchSide() {
+  side = '';
+  localStorage.removeItem('cab_side');
+  show('view-side');
 }
 function lockDown() {
   role = 'guide'; pin = '';
@@ -338,7 +430,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -352,10 +444,10 @@ function boot() {
       var b = document.createElement('button');
       b.className = 'chip red' + (p === user ? ' on' : '');
       b.textContent = p;
-      b.onclick = function(){ user = p; localStorage.setItem('cab_user', p); go('home'); };
+      b.onclick = function(){ user = p; localStorage.setItem('cab_user', p); if (side) go('home'); else show('view-side'); };
       pp.appendChild(b);
     });
-    if (user) go('home'); else show('view-who');
+    if (user && side) go('home'); else if (user) show('view-side'); else show('view-who');
   }, function(e){ toast('Could not load register — check signal and reload', true); });
 }
 
@@ -366,16 +458,27 @@ function go(view) {
     var tagged = DB.bikes.filter(function(b){ return b.barcode; }).length;
     document.getElementById('progress').textContent =
       tagged + ' of ' + DB.bikes.length + ' bikes tagged';
+    if (!side) { show('view-side'); return; }
+    paintSide_();
     paintRoles_();
     show('view-home');
   } else if (view === 'dash') {
     renderDash();
     show('view-dash');
-  } else if (view === 'assign' || view === 'lookup' || view === 'workshop') {
+  } else if (view === 'report') {
+    loadReport(reportDays);
+    show('view-report');
+  } else if (view === 'tour') {
+    tourSession = [];
+    renderTourHub();
+    show('view-tour');
+  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in') {
     mode = view;
     document.getElementById('scan-title').textContent =
       view === 'assign' ? 'Scan the sticker on the bike'
-      : view === 'workshop' ? 'Scan the bike you worked on' : 'Scan a bike';
+      : view === 'workshop' ? 'Scan the bike you worked on'
+      : view === 'tour-out' ? 'Scan each bike going on tour'
+      : view === 'tour-in' ? 'Scan each bike coming back' : 'Scan a bike';
     document.getElementById('manual').value = '';
     var sb = document.getElementById('snapbtn');
     sb.className = 'quiet'; sb.style.marginTop = '10px';
@@ -451,6 +554,16 @@ function onCode(code) {
     document.getElementById('filter').value = '';
     renderList();
     show('view-pick');
+  } else if (mode === 'tour-out' || mode === 'tour-in') {
+    var dir = mode === 'tour-out' ? 'out' : 'in';
+    TOUR_CALL({ barcode: code, dir: dir, user: user }, function(r){
+      if (r.notFound) { toast('No bike carries ' + code + ' \u2014 assign it first', true); go(mode); return; }
+      if (r.blocked) { toast(r.assetId + ' is ' + r.status + ' \u2014 not tour-ready', true); go(mode); return; }
+      if (r.already) { toast(r.assetId + ' is already out', true); go(mode); return; }
+      tourSession.push(r.assetId);
+      toast(r.assetId + (dir === 'out' ? ' \u2014 out (' + tourSession.length + ' this tour)' : ' \u2014 back in'));
+      go(mode);            // straight back to the scanner \u2014 next bike
+    }, function(){ toast('Save failed \u2014 check signal', true); go(mode); });
   } else if (mode === 'workshop') {
     var onFound = function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet — assign it first', true); go('workshop'); return; }
@@ -600,14 +713,14 @@ var SITES = [
   { name: 'Franschhoek', type: 'SELLING' }
 ];
 var dashFilter = 'All';
-var STATUS_COLORS = { 'Available':'#1B7A3D', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Out of Service':'#D2141B', 'Other':'#888888' };
-var STATUS_LABELS = { 'Available':'Ready', 'Workshop':'On the bench', 'Waiting for parts':'Waiting for parts', 'Out of Service':'Out of service', 'Other':'Other' };
+var STATUS_COLORS = { 'Available':'#1B7A3D', 'On tour':'#1D5FBF', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Out of Service':'#D2141B', 'Other':'#888888' };
+var STATUS_LABELS = { 'Available':'Ready', 'On tour':'On tour', 'Workshop':'On the bench', 'Waiting for parts':'Waiting for parts', 'Out of Service':'Out of service', 'Other':'Other' };
 
 function activeBikes_() { return DB.bikes.filter(function(b){ return b.active !== 'No'; }); }
+var ACCESSORY_CATS = ['Buggy', 'Baby seat', 'Trailer'];
 function bucketCat_(b) {
-  if (b.category === 'E-Bike') return 'E-Bike';
-  if (b.category === 'Kids') return 'Kids';
-  return 'Standard';
+  if (ACCESSORY_CATS.indexOf(b.category) !== -1) return 'Accessories';
+  return b.category || 'Uncategorised';
 }
 function bucketSize_(b) {
   if (bucketCat_(b) === 'Kids') return b.wheelSize ? 'Kids ' + b.wheelSize : 'Kids';
@@ -654,7 +767,14 @@ function renderDash() {
   /* filter chips */
   var ff = document.getElementById('d-filters');
   ff.innerHTML = '';
-  ['All','Standard','E-Bike','Kids'].forEach(function(f){
+  var cats = ['All'];
+  bikes.forEach(function(b){ var c = bucketCat_(b); if (cats.indexOf(c) === -1) cats.push(c); });
+  cats.slice(1).sort();
+  var counts_ = {};
+  bikes.forEach(function(b){ var c = bucketCat_(b); counts_[c] = (counts_[c] || 0) + 1; });
+  cats = ['All'].concat(cats.slice(1).sort(function(a,b){ return (counts_[b]||0) - (counts_[a]||0); }));
+  if (cats.indexOf(dashFilter) === -1) dashFilter = 'All';
+  cats.forEach(function(f){
     var b = document.createElement('button');
     b.className = 'chip' + (f === dashFilter ? ' on' : '');
     b.textContent = f;
@@ -777,6 +897,7 @@ var JOB_WORK = ['Puncture','Brakes','Gears','Chain / drivetrain','Wheel true','F
 var JOB_MINS = ['15','30','45','60','90','120'];
 var OUTCOMES = [
   { v:'Available', label:'Ready to ride', cls:'ready' },
+  { v:'On tour', label:'On tour', cls:'tour' },
   { v:'Workshop', label:'On the bench', cls:'' },
   { v:'Waiting for parts', label:'Waiting for parts', cls:'wait' },
   { v:'Out of Service', label:'Out of service', cls:'oos' }
@@ -896,8 +1017,82 @@ document.getElementById('j-notes').addEventListener('input', jobSaveState);
 function LOOKUP_CALL(code, ok, err) { apiPost({ action: 'lookup', barcode: code }, ok, err); }
 function AUTH_CALL(p, ok, err) { apiPost({ action: 'auth', pin: p }, ok, err); }
 function FAULT_CALL(p, ok, err) { p.action = 'fault'; apiPost(p, ok, err); }
+function REPORT_CALL(days, ok, err) { apiPost({ action: 'report', days: days, pin: pin }, ok, err); }
+function TOUR_CALL(p, ok, err) { p.action = 'tour'; apiPost(p, ok, err); }
+function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
 
+/* ---------- tour hub ---------- */
+var tourSession = [];
+function renderTourHub() {
+  var el = document.getElementById('t-out');
+  var list = DB.onTour || [];
+  if (!list.length) { el.innerHTML = '<p class="note">Nothing out \u2014 all bikes are home.</p>'; return; }
+  var byGuide = {};
+  list.forEach(function(t){ (byGuide[t.guide || '?'] = byGuide[t.guide || '?'] || []).push(t); });
+  var h = '';
+  Object.keys(byGuide).sort().forEach(function(g){
+    var items = byGuide[g];
+    var since = '';
+    var d = new Date(items[0].when);
+    if (!isNaN(d)) since = ' \u00b7 since ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+    h += '<div class="move"><b>' + g + '</b> \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') + since +
+         '<div class="meta">' + items.map(function(t){ return t.assetId; }).join(' \u00b7 ') + '</div></div>';
+  });
+  el.innerHTML = h;
+  // refresh from server so the list is current, not cached
+  REFRESH_DATA(function(){ if (!document.getElementById('view-tour').classList.contains('hidden')) {} });
+}
+
+/* ---------- workshop report ---------- */
+var reportDays = 7;
+function loadReport(days) {
+  reportDays = days;
+  var pp = document.getElementById('r-period');
+  pp.innerHTML = '';
+  [{d:1,l:'Today'},{d:7,l:'7 days'},{d:30,l:'30 days'}].forEach(function(o){
+    var b = document.createElement('button');
+    b.className = 'chip' + (o.d === reportDays ? ' on' : '');
+    b.textContent = o.l;
+    b.onclick = function(){ loadReport(o.d); };
+    pp.appendChild(b);
+  });
+  document.getElementById('r-list').innerHTML = '<p class="note">Loading&hellip;</p>';
+  REPORT_CALL(reportDays, function(r){
+    if (r.denied) { toast('Management PIN needed', true); go('home'); return; }
+    renderReport(r.jobs || []);
+  }, function(){ document.getElementById('r-list').innerHTML = '<p class="note">Could not load &mdash; check signal.</p>'; });
+}
+function renderReport(jobs) {
+  var mins = 0, serv = 0, bikes = {}, techs = {};
+  jobs.forEach(function(j){
+    mins += j.mins; if (j.service) serv++;
+    bikes[j.assetId] = true;
+    var t = techs[j.by || '?'] = techs[j.by || '?'] || { n: 0, m: 0, s: 0 };
+    t.n++; t.m += j.mins; if (j.service) t.s++;
+  });
+  document.getElementById('r-jobs').textContent = jobs.length;
+  document.getElementById('r-mins').textContent = mins;
+  document.getElementById('r-serv').textContent = serv;
+  document.getElementById('r-bikes').textContent = Object.keys(bikes).length;
+
+  var th = '<table class="dash"><tr><th>Tech</th><th>Jobs</th><th>Minutes</th><th>Services</th></tr>';
+  Object.keys(techs).sort(function(a,b){ return techs[b].n - techs[a].n; }).forEach(function(t){
+    th += '<tr><td>' + t + '</td><td>' + techs[t].n + '</td><td>' + techs[t].m + '</td><td>' + techs[t].s + '</td></tr>';
+  });
+  th += '</table>';
+  document.getElementById('r-techs').innerHTML = Object.keys(techs).length ? th : '<p class="note">Nothing in this period.</p>';
+
+  var lh = '';
+  jobs.forEach(function(j){
+    var d = new Date(j.when);
+    var day = isNaN(d) ? '' : ('0'+d.getDate()).slice(-2) + '/' + ('0'+(d.getMonth()+1)).slice(-2) + ' ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+    lh += '<div class="move"><b>' + j.assetId + '</b> ' + (j.service ? '<span class="pill ready" style="font-size:10px;padding:2px 8px">service</span>' : '') +
+          '<div class="meta">' + j.work + (j.parts ? ' \u00b7 ' + j.parts : '') + '</div>' +
+          '<div class="meta">' + [j.by, j.mins ? j.mins + ' min' : '', day].filter(Boolean).join(' \u00b7 ') + '</div></div>';
+  });
+  document.getElementById('r-list').innerHTML = lh || '<p class="note">No jobs logged in this period.</p>';
+}
 boot();
 </script>
 </body>
