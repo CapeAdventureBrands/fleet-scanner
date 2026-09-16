@@ -113,6 +113,11 @@
   .move { padding:9px 2px; border-bottom:1px solid var(--line); font-size:13px; }
   .move b { font-family:'Montserrat',sans-serif; }
   .move .meta { color:var(--grey); font-size:12px; }
+  .lock { font-size:14px; }
+  .tile.open .lock { display:none; }
+  .fault { border:2px solid var(--red); background:#FBE3E4; padding:10px 12px; margin-top:12px; font-size:13px; }
+  .fault b { font-family:'Montserrat',sans-serif; }
+  .fault .m { color:#8A2A2E; font-size:12px; }
   .hidden { display:none; }
   .back { background:none; border:none; font:600 14px 'Inter',sans-serif; color:var(--grey); cursor:pointer; padding:8px 0; }
   .note { font-size:13px; color:var(--grey); margin-top:8px; }
@@ -134,23 +139,24 @@
   <!-- HOME -->
   <section id="view-home" class="hidden">
     <div class="tiles">
-      <button class="tile" onclick="go('assign')">
-        <div class="big">Assign barcodes</div>
-        <div class="sub">Tagging day — scan a sticker, pick the bike</div>
-      </button>
       <button class="tile" onclick="go('lookup')">
         <div class="big">Look up &amp; move</div>
-        <div class="sub">Scan a bike to see it, change location or status</div>
+        <div class="sub">Scan a bike — check it, move it, report a fault</div>
       </button>
-      <button class="tile" onclick="go('workshop')">
-        <div class="big">Log workshop work</div>
+      <button class="tile" onclick="requireRole('workshop','workshop')" id="tile-workshop">
+        <div class="big">Log workshop work <span class="lock">&#128274;</span></div>
         <div class="sub">Scan the bike, record what you did and what you used</div>
       </button>
-      <button class="tile" onclick="go('dash')">
-        <div class="big">Location dashboard</div>
+      <button class="tile" onclick="requireRole('admin','dash')" id="tile-dash">
+        <div class="big">Location dashboard <span class="lock">&#128274;</span></div>
         <div class="sub">Live counts by site and status</div>
       </button>
+      <button class="tile" onclick="requireRole('admin','assign')" id="tile-assign">
+        <div class="big">Assign barcodes <span class="lock">&#128274;</span></div>
+        <div class="sub">Tagging day — scan a sticker, pick the bike</div>
+      </button>
     </div>
+    <p class="note" id="role-note"></p>
     <p class="note" id="progress"></p>
   </section>
 
@@ -221,6 +227,7 @@
           <div class="fact"><div class="v" id="j-wheel"></div><div class="k">Wheel</div></div>
           <div class="fact" style="grid-column:1 / -1"><div class="v" id="j-lastserv"></div><div class="k">Last service</div></div>
         </div>
+        <div id="j-faults"></div>
         <div id="j-hist"></div>
       </div>
     </div>
@@ -256,6 +263,11 @@
         <div class="fact"><div class="v" id="b-status"></div><div class="k">Status</div></div>
       </div>
     </div>
+    <div id="b-faults"></div>
+    <h2>Report a fault</h2>
+    <div class="chips" id="f-chips"></div>
+    <input type="text" id="f-text" placeholder="What's wrong? (add detail)" style="margin-top:10px" autocomplete="off">
+    <button class="quiet" style="width:100%;margin-top:10px" id="f-send" onclick="sendFault()">Log fault for the workshop</button>
     <h2>Move to</h2>
     <div class="chips" id="locs"></div>
     <h2>Set status</h2>
@@ -283,6 +295,39 @@ function apiPost(payload, cb, err) {
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
 var user = localStorage.getItem('cab_user') || '';
+var role = localStorage.getItem('cab_role') || 'guide';
+var pin  = localStorage.getItem('cab_pin') || '';
+function roleRank_(r){ return r === 'admin' ? 2 : r === 'workshop' ? 1 : 0; }
+function requireRole(need, view) {
+  if (roleRank_(role) >= roleRank_(need)) { go(view); return; }
+  var p = window.prompt(need === 'admin' ? 'Management PIN:' : 'Workshop PIN:');
+  if (p === null) return;
+  AUTH_CALL(p, function(r){
+    if (roleRank_(r.role) >= roleRank_(need)) {
+      role = r.role; pin = p;
+      localStorage.setItem('cab_role', role); localStorage.setItem('cab_pin', pin);
+      paintRoles_(); toast('Unlocked'); go(view);
+    } else {
+      toast('Wrong PIN', true);
+    }
+  }, function(){ toast('Could not check PIN — signal?', true); });
+}
+function paintRoles_() {
+  var w = document.getElementById('tile-workshop'), d = document.getElementById('tile-dash'),
+      a = document.getElementById('tile-assign');
+  if (w) w.className = 'tile' + (roleRank_(role) >= 1 ? ' open' : '');
+  if (d) d.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
+  if (a) a.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
+  var n = document.getElementById('role-note');
+  if (n) n.innerHTML = role === 'guide' ? 'Guide access &middot; locked tiles need a PIN'
+    : (role === 'workshop' ? 'Workshop access' : 'Management access') +
+      ' &middot; <a href="#" onclick="lockDown();return false">lock</a>';
+}
+function lockDown() {
+  role = 'guide'; pin = '';
+  localStorage.removeItem('cab_role'); localStorage.removeItem('cab_pin');
+  paintRoles_(); toast('Locked');
+}
 var mode = 'assign';          // 'assign' | 'lookup'
 var scanner = null;
 var current = { code: '', bike: null, newLoc: '', newStatus: '' };
@@ -321,6 +366,7 @@ function go(view) {
     var tagged = DB.bikes.filter(function(b){ return b.barcode; }).length;
     document.getElementById('progress').textContent =
       tagged + ' of ' + DB.bikes.length + ' bikes tagged';
+    paintRoles_();
     show('view-home');
   } else if (view === 'dash') {
     renderDash();
@@ -408,14 +454,14 @@ function onCode(code) {
   } else if (mode === 'workshop') {
     var onFound = function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet — assign it first', true); go('workshop'); return; }
-      openJob(r.bike, r.history);
+      openJob(r.bike, r.history, r.faults);
     };
     var onErr = function(){ toast('Lookup failed — check signal', true); go('workshop'); };
     LOOKUP_CALL(code, onFound, onErr);
   } else {
     apiPost({ action: 'lookup', barcode: code }, function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet', true); go('lookup'); return; }
-      openBike(r.bike);
+      openBike(r.bike, r.faults);
     }, function(e){ toast('Save failed — check signal', true); go('lookup'); });
   }
 }
@@ -445,7 +491,8 @@ function renderList() {
 }
 
 function confirmAssign(bike, force) {
-  apiPost({ action: 'assign', barcode: current.code, assetId: bike.assetId, user: user, force: !!force }, function(r){
+  apiPost({ action: 'assign', barcode: current.code, assetId: bike.assetId, user: user, force: !!force, pin: pin }, function(r){
+    if (r.denied) { toast('Management PIN needed — unlock on the home screen', true); return; }
     if (r.error) { toast(r.error, true); return; }
     if (r.conflict === 'barcode-taken') {
       if (confirm('Barcode ' + current.code + ' is already on ' + r.holder +
@@ -464,8 +511,46 @@ function confirmAssign(bike, force) {
 }
 
 /* ---------- lookup / move ---------- */
-function openBike(b) {
+var FAULT_CHIPS = ['Puncture','Brakes','Gears','Chain','Battery / motor','Wheel / spokes','Other'];
+var faultSel = [];
+function renderFaults_(id, faults, forWorkshop) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var h = '';
+  (faults || []).forEach(function(f){
+    h += '<div class="fault"><b>' + f.fault + '</b><div class="m">' +
+         [f.by, fmtDate_(f.when)].filter(Boolean).join(' · ') +
+         (forWorkshop ? ' · clears when a job sets it Ready to ride' : '') + '</div></div>';
+  });
+  el.innerHTML = h;
+}
+function sendFault() {
+  var notes = document.getElementById('f-text').value.trim();
+  var parts = faultSel.slice();
+  if (notes) parts.push(notes);
+  var fault = parts.join(' — ');
+  if (!fault) { toast('Tap a fault type or describe it first', true); return; }
+  document.getElementById('f-send').disabled = true;
+  FAULT_CALL({ barcode: current.code, fault: fault, user: user }, function(r){
+    document.getElementById('f-send').disabled = false;
+    if (r.notFound) { toast('Bike not found — rescan', true); return; }
+    toast(r.assetId + ' — fault logged for the workshop');
+    current.faults = (current.faults || []);
+    current.faults.unshift({ fault: fault, by: user, when: new Date().toISOString() });
+    renderFaults_('b-faults', current.faults, false);
+    document.getElementById('f-text').value = '';
+    faultSel = [];
+    multiChips('f-chips', FAULT_CHIPS, function(sel){ faultSel = sel; });
+  }, function(){ document.getElementById('f-send').disabled = false; toast('Save failed — check signal', true); });
+}
+
+function openBike(b, faults) {
   current.bike = b; current.newLoc = ''; current.newStatus = '';
+  current.faults = faults || [];
+  renderFaults_('b-faults', current.faults, false);
+  faultSel = [];
+  multiChips('f-chips', FAULT_CHIPS, function(sel){ faultSel = sel; });
+  document.getElementById('f-text').value = '';
   document.getElementById('b-num').textContent = b.assetId;
   document.getElementById('b-meta').textContent =
     [b.category, b.brand, b.frameSize, b.wheelSize, b.colour].filter(Boolean).join(' · ');
@@ -724,6 +809,7 @@ function openJob(b, hist) {
   document.getElementById('j-wheel').textContent = b.wheelSize || '\u2014';
   document.getElementById('j-lastserv').textContent = fmtDate_(b.lastService);
 
+  renderFaults_('j-faults', arguments.length > 2 ? arguments[2] : [], true);
   var hh = '';
   (hist || []).forEach(function(h){
     hh += '<div class="hist"><span class="d">' + fmtDate_(h.when) + '</span><span><b>' +
@@ -797,6 +883,7 @@ function saveJob() {
     barcode: current.code, work: work, minutes: job.mins, parts: parts.join(', '),
     outcome: job.outcome, isService: isService, user: user
   }, function(r){
+    if (r.denied) { toast('Workshop PIN needed \u2014 unlock on the home screen', true); jobSaveState(); return; }
     if (r.notFound) { toast('Bike not found \u2014 rescan', true); return; }
     current.bike.status = job.outcome;
     if (isService) current.bike.lastService = new Date().toISOString();
@@ -807,7 +894,9 @@ function saveJob() {
 document.getElementById('j-notes').addEventListener('input', jobSaveState);
 
 function LOOKUP_CALL(code, ok, err) { apiPost({ action: 'lookup', barcode: code }, ok, err); }
-function JOB_CALL(p, ok, err) { p.action = 'job'; apiPost(p, ok, err); }
+function AUTH_CALL(p, ok, err) { apiPost({ action: 'auth', pin: p }, ok, err); }
+function FAULT_CALL(p, ok, err) { p.action = 'fault'; apiPost(p, ok, err); }
+function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
 
 boot();
 </script>
