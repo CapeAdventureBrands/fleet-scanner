@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>CAB Fleet Scanner</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root { --red:#D2141B; --black:#111111; --grey:#6B6B6B; --line:#E3E3E3; --ok:#1B7A3D; }
+  * { box-sizing:border-box; margin:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Inter',system-ui,sans-serif; color:var(--black); background:#fff; }
+  .wrap { max-width:520px; margin:0 auto; padding:14px 16px 90px; }
+
+  header { display:flex; align-items:baseline; gap:10px; padding:6px 0 14px; border-bottom:3px solid var(--red); }
+  header h1 { font-family:'Montserrat',sans-serif; font-weight:800; font-size:19px; letter-spacing:-.3px; }
+  header .who { margin-left:auto; font-size:13px; color:var(--grey); }
+  header .who b { color:var(--black); }
+
+  h2 { font-family:'Montserrat',sans-serif; font-weight:800; font-size:15px; margin:20px 0 10px; }
+  h2::before { content:'✓ '; color:var(--red); }
+
+  .tiles { display:grid; gap:12px; margin-top:18px; }
+  .tile { border:2px solid var(--black); padding:18px 16px; background:#fff; text-align:left; cursor:pointer; }
+  .tile .big { font-family:'Montserrat',sans-serif; font-weight:800; font-size:20px; }
+  .tile .sub { color:var(--grey); font-size:13px; margin-top:4px; }
+  .tile:active { background:#F5F5F5; }
+
+  #reader { width:100%; border:2px solid var(--black); overflow:hidden; }
+  #reader video { display:block; }
+
+  .manual { display:flex; gap:8px; margin-top:10px; }
+  input[type=text], input[type=search] {
+    width:100%; font:16px 'Inter',sans-serif; padding:12px; border:2px solid var(--black); border-radius:0;
+  }
+  input:focus { outline:3px solid var(--red); outline-offset:-1px; }
+
+  button.primary, button.quiet {
+    font:600 15px 'Inter',sans-serif; padding:12px 18px; border:2px solid var(--black); cursor:pointer; border-radius:0;
+  }
+  button.primary { background:var(--red); border-color:var(--red); color:#fff; }
+  button.quiet { background:#fff; color:var(--black); }
+  button:disabled { opacity:.4; }
+
+  .code-strip { display:flex; align-items:center; gap:10px; margin:14px 0 4px; }
+  .code-strip .code { font-family:'Montserrat',sans-serif; font-weight:800; font-size:24px; word-break:break-all; }
+  .code-strip small { color:var(--grey); }
+
+  .list { border-top:1px solid var(--line); margin-top:8px; max-height:46vh; overflow-y:auto; }
+  .item { display:flex; align-items:center; gap:10px; padding:12px 4px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .item:active { background:#F5F5F5; }
+  .item .num { font-family:'Montserrat',sans-serif; font-weight:800; font-size:17px; min-width:96px; }
+  .item .meta { color:var(--grey); font-size:13px; }
+  .item .tagged { margin-left:auto; font-size:12px; color:var(--ok); font-weight:600; }
+
+  .card { border:2px solid var(--black); padding:16px; margin-top:14px; }
+  .card .num { font-family:'Montserrat',sans-serif; font-weight:800; font-size:30px; line-height:1.1; }
+  .card .meta { color:var(--grey); font-size:14px; margin-top:4px; }
+  .facts { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; margin-top:14px; }
+  .fact .v { font-family:'Montserrat',sans-serif; font-weight:800; font-size:17px; }
+  .fact .k { font-size:12px; color:var(--grey); }
+
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .chip { padding:10px 14px; border:2px solid var(--black); background:#fff; font:600 14px 'Inter',sans-serif; cursor:pointer; border-radius:0; }
+  .chip.on { background:var(--black); color:#fff; }
+  .chip.red.on { background:var(--red); border-color:var(--red); }
+
+  .bar { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--line);
+         padding:10px 16px calc(10px + env(safe-area-inset-bottom)); display:flex; gap:10px; max-width:520px; margin:0 auto; }
+  .bar button { flex:1; }
+
+  .toast { position:fixed; top:14px; left:50%; transform:translateX(-50%); background:var(--ok); color:#fff;
+           font:600 14px 'Inter',sans-serif; padding:12px 18px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:50; }
+  .toast.err { background:var(--red); }
+  .toast.show { opacity:1; }
+
+  table.dash { width:100%; border-collapse:collapse; margin-top:10px; }
+  table.dash th, table.dash td { border:1px solid var(--line); padding:9px 6px; font-size:13px; text-align:right; }
+  table.dash th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:11px; background:#F5F5F5; }
+  table.dash td:first-child, table.dash th:first-child { text-align:left; font-weight:600; }
+  table.dash tr.total td { border-top:2px solid var(--black); font-family:'Montserrat',sans-serif; font-weight:800; }
+  table.dash td.zero { color:#C7C7C7; }
+  table.dash td.oos { color:var(--red); font-weight:600; }
+  .jcard { border:2px solid var(--black); margin-top:6px; }
+  .jhead { background:var(--black); color:#fff; padding:12px 14px; }
+  .jhead small { color:#BBB; font-size:11px; letter-spacing:.08em; }
+  .jhead .num { font-family:'Montserrat',sans-serif; font-weight:800; font-size:26px; line-height:1.15; }
+  .jbody { padding:14px; }
+  .pill { display:inline-block; padding:5px 12px; border-radius:99px; font-size:12px; font-weight:600; background:#F2EBDD; }
+  .pill.ready { background:#E2F1E6; color:var(--ok); }
+  .pill.oos { background:#FBE3E4; color:var(--red); }
+  .pill.wait { background:#FBF3DC; color:#8A6510; }
+  .hist-title { font-size:11px; letter-spacing:.06em; color:var(--grey); font-weight:600; text-transform:uppercase; margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
+  .hist { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .hist .d { color:var(--grey); font-size:12px; min-width:74px; }
+  .hist .m { color:var(--grey); font-size:12px; }
+  .k-label { font-size:11px; letter-spacing:.06em; color:var(--grey); font-weight:600; text-transform:uppercase; }
+  .ready-line { display:flex; align-items:baseline; gap:10px; margin-top:2px; }
+  .ready-pct { font-family:'Montserrat',sans-serif; font-weight:800; font-size:42px; }
+  .ready-sub { color:var(--grey); font-size:13px; }
+  .stackbar { display:flex; height:16px; margin-top:8px; border:1px solid var(--line); }
+  .stackbar div { height:100%; }
+  .legend { display:flex; flex-wrap:wrap; gap:12px; margin-top:8px; font-size:12px; color:var(--grey); }
+  .legend b { color:var(--black); }
+  .dot { display:inline-block; width:8px; height:8px; margin-right:4px; }
+  table.dash td.warn { background:#FBF3DC; }
+  table.dash td.bad { background:#FBE3E4; color:var(--red); font-weight:700; }
+  table.dash td .down { display:block; font-size:10px; color:var(--grey); font-weight:400; }
+  table.dash th small { display:block; font-size:9px; color:var(--grey); letter-spacing:.05em; }
+  .gap { display:flex; align-items:baseline; gap:8px; padding:10px 2px; border-bottom:1px solid var(--line); font-size:13px; }
+  .gap b { font-family:'Montserrat',sans-serif; }
+  .gap .why { margin-left:auto; color:var(--grey); font-size:12px; text-align:right; }
+  .move { padding:9px 2px; border-bottom:1px solid var(--line); font-size:13px; }
+  .move b { font-family:'Montserrat',sans-serif; }
+  .move .meta { color:var(--grey); font-size:12px; }
+  .hidden { display:none; }
+  .back { background:none; border:none; font:600 14px 'Inter',sans-serif; color:var(--grey); cursor:pointer; padding:8px 0; }
+  .note { font-size:13px; color:var(--grey); margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>CAB Fleet Scanner</h1>
+    <span class="who" id="whoami"></span>
+  </header>
+
+  <!-- WHO -->
+  <section id="view-who">
+    <h2>Who is scanning?</h2>
+    <div class="chips" id="people"></div>
+  </section>
+
+  <!-- HOME -->
+  <section id="view-home" class="hidden">
+    <div class="tiles">
+      <button class="tile" onclick="go('assign')">
+        <div class="big">Assign barcodes</div>
+        <div class="sub">Tagging day — scan a sticker, pick the bike</div>
+      </button>
+      <button class="tile" onclick="go('lookup')">
+        <div class="big">Look up &amp; move</div>
+        <div class="sub">Scan a bike to see it, change location or status</div>
+      </button>
+      <button class="tile" onclick="go('workshop')">
+        <div class="big">Log workshop work</div>
+        <div class="sub">Scan the bike, record what you did and what you used</div>
+      </button>
+      <button class="tile" onclick="go('dash')">
+        <div class="big">Location dashboard</div>
+        <div class="sub">Live counts by site and status</div>
+      </button>
+    </div>
+    <p class="note" id="progress"></p>
+  </section>
+
+  <!-- SCAN (shared) -->
+  <section id="view-scan" class="hidden">
+    <button class="back" onclick="go('home')">‹ Back</button>
+    <h2 id="scan-title">Scan a barcode</h2>
+    <div id="reader"></div>
+    <input type="file" id="snap" accept="image/*" capture="environment" class="hidden" onchange="snapDecode(this)">
+    <button class="quiet" id="snapbtn" style="width:100%;margin-top:10px" onclick="document.getElementById('snap').click()">
+      &#128247; Snap the barcode (backup &mdash; testing)
+    </button>
+    <p class="note" id="scan-hint">Point the camera at the barcode. If it won't read, snap a photo or type the number.</p>
+    <div class="manual">
+      <input type="text" id="manual" inputmode="text" autocomplete="off"
+             placeholder="Or type the number under the barcode">
+      <button class="primary" onclick="manualGo()">Go</button>
+    </div>
+  </section>
+
+  <!-- ASSIGN: pick bike -->
+  <section id="view-pick" class="hidden">
+    <button class="back" onclick="go('assign')">‹ Rescan</button>
+    <div class="code-strip"><small>Barcode</small><span class="code" id="pick-code"></span></div>
+    <h2>Which bike is this?</h2>
+    <input type="search" id="filter" placeholder="Search bike number, category, brand…" oninput="renderList()">
+    <div class="list" id="bikelist"></div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section id="view-dash" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+
+    <div class="card" style="margin-top:6px">
+      <div class="k-label">Fleet ready right now</div>
+      <div class="ready-line"><span class="ready-pct" id="d-pct"></span><span class="ready-sub" id="d-ready-sub"></span></div>
+      <div class="stackbar" id="d-bar"></div>
+      <div class="legend" id="d-legend"></div>
+    </div>
+
+    <h2>What&rsquo;s where, by size</h2>
+    <div class="chips" id="d-filters"></div>
+    <p class="note">Big number = ready to ride. Red = nothing at a selling site. Amber = down to one. Tap a cell for the bikes.</p>
+    <div id="d-matrix" style="overflow-x:auto"></div>
+    <div id="d-celllist"></div>
+
+    <h2>Gaps worth moving on today</h2>
+    <div id="d-gaps"></div>
+
+    <h2>Last movements</h2>
+    <div id="d-moves"></div>
+
+    <p class="note" id="dash-note"></p>
+    <button class="quiet" style="width:100%;margin-top:12px" onclick="refreshDash()">Refresh</button>
+  </section>
+
+  <!-- WORKSHOP JOB -->
+  <section id="view-job" class="hidden">
+    <button class="back" onclick="go('workshop')">&#8249; Scan another</button>
+    <div class="jcard">
+      <div class="jhead"><small id="j-code"></small><div class="num" id="j-num"></div></div>
+      <div class="jbody">
+        <span class="pill" id="j-pill"></span>
+        <div class="facts">
+          <div class="fact"><div class="v" id="j-loc"></div><div class="k">Where it is</div></div>
+          <div class="fact"><div class="v" id="j-type"></div><div class="k">Type</div></div>
+          <div class="fact"><div class="v" id="j-frame"></div><div class="k">Frame</div></div>
+          <div class="fact"><div class="v" id="j-wheel"></div><div class="k">Wheel</div></div>
+          <div class="fact" style="grid-column:1 / -1"><div class="v" id="j-lastserv"></div><div class="k">Last service</div></div>
+        </div>
+        <div id="j-hist"></div>
+      </div>
+    </div>
+
+    <h2>What did you do?</h2>
+    <div class="chips" id="j-work"></div>
+    <input type="text" id="j-notes" placeholder="Notes / detail (optional)" style="margin-top:10px" autocomplete="off">
+    <h2>How long?</h2>
+    <div class="chips" id="j-mins"></div>
+    <h2>Parts used</h2>
+    <div class="chips" id="j-parts-chips"></div>
+    <input type="text" id="j-parts" placeholder="Other parts (optional)" style="margin-top:10px" autocomplete="off">
+    <h2>Where does it stand now?</h2>
+    <div class="chips" id="j-outcome"></div>
+    <label style="display:flex;align-items:center;gap:10px;margin-top:14px;font-size:14px">
+      <input type="checkbox" id="j-service" style="width:20px;height:20px;accent-color:var(--red)">
+      Counts as a service (stamps today as Last Service)
+    </label>
+    <div class="bar">
+      <button class="quiet" onclick="go('workshop')">Cancel</button>
+      <button class="primary" id="j-save" onclick="saveJob()" disabled>Save job</button>
+    </div>
+  </section>
+
+  <!-- LOOKUP: bike card -->
+  <section id="view-bike" class="hidden">
+    <button class="back" onclick="go('lookup')">‹ Scan another</button>
+    <div class="card">
+      <div class="num" id="b-num"></div>
+      <div class="meta" id="b-meta"></div>
+      <div class="facts">
+        <div class="fact"><div class="v" id="b-loc"></div><div class="k">Location</div></div>
+        <div class="fact"><div class="v" id="b-status"></div><div class="k">Status</div></div>
+      </div>
+    </div>
+    <h2>Move to</h2>
+    <div class="chips" id="locs"></div>
+    <h2>Set status</h2>
+    <div class="chips" id="stats"></div>
+    <div class="bar">
+      <button class="quiet" onclick="go('lookup')">Cancel</button>
+      <button class="primary" id="save" onclick="saveMove()" disabled>Save changes</button>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzX7g3yuAfBVWVOsduiTmYyggBCNm1qcnvvR1RiNg6zrQsQWQqYJmBkQ-sGGQvIs0rO/exec';
+/* ===================================================================== */
+
+function apiGet(cb, err) {
+  fetch(EXEC_URL + '?api=data').then(function(r){ return r.json(); }).then(cb).catch(err);
+}
+function apiPost(payload, cb, err) {
+  fetch(EXEC_URL, { method: 'POST', body: JSON.stringify(payload) })
+    .then(function(r){ return r.json(); }).then(cb).catch(err);
+}
+
+var DB = { bikes: [], locations: [], statuses: [], people: [] };
+var user = localStorage.getItem('cab_user') || '';
+var mode = 'assign';          // 'assign' | 'lookup'
+var scanner = null;
+var current = { code: '', bike: null, newLoc: '', newStatus: '' };
+
+function toast(msg, err) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '');
+  setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
+}
+function show(id) {
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job'].forEach(function(v){
+    document.getElementById(v).classList.toggle('hidden', v !== id);
+  });
+}
+
+function boot() {
+  apiGet(function(d){
+    DB = d;
+    var pp = document.getElementById('people');
+    pp.innerHTML = '';
+    d.people.forEach(function(p){
+      var b = document.createElement('button');
+      b.className = 'chip red' + (p === user ? ' on' : '');
+      b.textContent = p;
+      b.onclick = function(){ user = p; localStorage.setItem('cab_user', p); go('home'); };
+      pp.appendChild(b);
+    });
+    if (user) go('home'); else show('view-who');
+  }, function(e){ toast('Could not load register — check signal and reload', true); });
+}
+
+function go(view) {
+  stopScanner();
+  document.getElementById('whoami').innerHTML = user ? 'Scanning as <b>' + user + '</b>' : '';
+  if (view === 'home') {
+    var tagged = DB.bikes.filter(function(b){ return b.barcode; }).length;
+    document.getElementById('progress').textContent =
+      tagged + ' of ' + DB.bikes.length + ' bikes tagged';
+    show('view-home');
+  } else if (view === 'dash') {
+    renderDash();
+    show('view-dash');
+  } else if (view === 'assign' || view === 'lookup' || view === 'workshop') {
+    mode = view;
+    document.getElementById('scan-title').textContent =
+      view === 'assign' ? 'Scan the sticker on the bike'
+      : view === 'workshop' ? 'Scan the bike you worked on' : 'Scan a bike';
+    document.getElementById('manual').value = '';
+    var sb = document.getElementById('snapbtn');
+    sb.className = 'quiet'; sb.style.marginTop = '10px';
+    sb.innerHTML = '&#128247; Snap the barcode (backup &mdash; testing)';
+    show('view-scan');
+    startScanner();
+  }
+}
+
+function formats_() {
+  if (typeof Html5QrcodeSupportedFormats === 'undefined') return null;
+  return [
+    Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+    Html5QrcodeSupportedFormats.ITF, Html5QrcodeSupportedFormats.CODABAR,
+    Html5QrcodeSupportedFormats.QR_CODE
+  ];
+}
+function startScanner() {
+  var FORMATS = formats_();
+  if (!FORMATS) {  // scanner library didn't load — snap/manual only
+    document.getElementById('reader').style.display = 'none';
+    return;
+  }
+  document.getElementById('reader').style.display = 'block';
+  scanner = new Html5Qrcode('reader', { formatsToSupport: FORMATS });
+  scanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 280, height: 140 } },
+    function(text) { onCode(text); },
+    function(){}
+  ).catch(function(){
+    // Live camera blocked here — hide the viewport, promote snap to primary
+    document.getElementById('reader').style.display = 'none';
+    var b = document.getElementById('snapbtn');
+    b.className = 'primary'; b.style.marginTop = '0';
+    b.innerHTML = '&#128247; Snap the barcode';
+    try { scanner.clear(); } catch(e) {}
+    scanner = null;
+  });
+}
+function snapDecode(input) {
+  if (!input.files || !input.files.length) return;
+  var file = input.files[0];
+  input.value = '';
+  stopScanner();
+  var FORMATS = formats_();
+  if (!FORMATS) { toast('Scanner library not loaded — type the code instead', true); return; }
+  var d = new Html5Qrcode('reader', { formatsToSupport: FORMATS });
+  document.getElementById('snapbtn').textContent = 'Reading…';
+  d.scanFileV2(file, false).then(function(r){
+    document.getElementById('snapbtn').innerHTML = document.getElementById('reader').style.display === 'none' ? '&#128247; Snap the barcode' : '&#128247; Snap the barcode (backup &mdash; testing)';
+    onCode(r.decodedText);
+  }).catch(function(){
+    document.getElementById('snapbtn').innerHTML = document.getElementById('reader').style.display === 'none' ? '&#128247; Snap the barcode' : '&#128247; Snap the barcode (backup &mdash; testing)';
+    toast("Couldn't read that photo — closer, square-on, or type it", true);
+  });
+}
+function stopScanner() {
+  if (scanner) { try { scanner.stop().then(function(){ scanner.clear(); }); } catch(e){} scanner = null; }
+}
+function manualGo() {
+  var v = document.getElementById('manual').value.trim();
+  if (v) onCode(v);
+}
+
+function onCode(code) {
+  stopScanner();
+  current.code = code;
+  if (mode === 'assign') {
+    document.getElementById('pick-code').textContent = code;
+    document.getElementById('filter').value = '';
+    renderList();
+    show('view-pick');
+  } else if (mode === 'workshop') {
+    var onFound = function(r){
+      if (r.notFound) { toast('No bike carries ' + code + ' yet — assign it first', true); go('workshop'); return; }
+      openJob(r.bike, r.history);
+    };
+    var onErr = function(){ toast('Lookup failed — check signal', true); go('workshop'); };
+    LOOKUP_CALL(code, onFound, onErr);
+  } else {
+    apiPost({ action: 'lookup', barcode: code }, function(r){
+      if (r.notFound) { toast('No bike carries ' + code + ' yet', true); go('lookup'); return; }
+      openBike(r.bike);
+    }, function(e){ toast('Save failed — check signal', true); go('lookup'); });
+  }
+}
+
+/* ---------- assign ---------- */
+function renderList() {
+  var q = document.getElementById('filter').value.toLowerCase();
+  var el = document.getElementById('bikelist');
+  el.innerHTML = '';
+  DB.bikes
+    .filter(function(b){ return b.active !== 'No'; })
+    .filter(function(b){
+      if (!q) return true;
+      return (b.bikeNumber + ' ' + b.assetId + ' ' + b.category + ' ' + b.brand + ' ' + b.colour)
+        .toLowerCase().indexOf(q) !== -1;
+    })
+    .slice(0, 60)
+    .forEach(function(b){
+      var d = document.createElement('div');
+      d.className = 'item';
+      d.innerHTML = '<span class="num">' + (b.assetId || b.bikeNumber) + '</span>' +
+        '<span class="meta">' + [b.category, b.brand, b.frameSize, b.location].filter(Boolean).join(' · ') + '</span>' +
+        (b.barcode ? '<span class="tagged">tagged</span>' : '');
+      d.onclick = function(){ confirmAssign(b, false); };
+      el.appendChild(d);
+    });
+}
+
+function confirmAssign(bike, force) {
+  apiPost({ action: 'assign', barcode: current.code, assetId: bike.assetId, user: user, force: !!force }, function(r){
+    if (r.error) { toast(r.error, true); return; }
+    if (r.conflict === 'barcode-taken') {
+      if (confirm('Barcode ' + current.code + ' is already on ' + r.holder +
+                  '.\nMove it to ' + bike.assetId + '?')) confirmAssign(bike, true);
+      return;
+    }
+    if (r.conflict === 'asset-tagged') {
+      if (confirm(bike.assetId + ' already has barcode ' + r.existing +
+                  '.\nReplace it with ' + current.code + '?')) confirmAssign(bike, true);
+      return;
+    }
+    bike.barcode = current.code;
+    toast(bike.assetId + ' tagged');
+    go('assign');            // straight back to the scanner — next bike
+  }, function(e){ toast('Save failed — check signal', true); });
+}
+
+/* ---------- lookup / move ---------- */
+function openBike(b) {
+  current.bike = b; current.newLoc = ''; current.newStatus = '';
+  document.getElementById('b-num').textContent = b.assetId;
+  document.getElementById('b-meta').textContent =
+    [b.category, b.brand, b.frameSize, b.wheelSize, b.colour].filter(Boolean).join(' · ');
+  document.getElementById('b-loc').textContent = b.location || '—';
+  document.getElementById('b-status').textContent = b.status || '—';
+  chipRow('locs', DB.locations, b.location, function(v){ current.newLoc = v; updateSave(); });
+  chipRow('stats', DB.statuses, b.status, function(v){ current.newStatus = v; updateSave(); });
+  updateSave();
+  show('view-bike');
+}
+function chipRow(id, values, currentVal, onPick) {
+  var el = document.getElementById(id);
+  el.innerHTML = '';
+  values.forEach(function(v){
+    var b = document.createElement('button');
+    b.className = 'chip' + (v === currentVal ? ' on' : '');
+    b.textContent = v;
+    b.onclick = function(){
+      Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
+      b.classList.add('on');
+      onPick(v);
+    };
+    el.appendChild(b);
+  });
+}
+function updateSave() {
+  var b = current.bike;
+  var changed = (current.newLoc && current.newLoc !== b.location) ||
+                (current.newStatus && current.newStatus !== b.status);
+  document.getElementById('save').disabled = !changed;
+}
+function saveMove() {
+  apiPost({ action: 'move', barcode: current.code, newLocation: current.newLoc, newStatus: current.newStatus, user: user }, function(r){
+    if (r.notFound) { toast('Bike not found — rescan', true); return; }
+    if (current.newLoc) current.bike.location = current.newLoc;
+    if (current.newStatus) current.bike.status = current.newStatus;
+    toast('Saved — ' + (r.changed.join('; ') || 'no change'));
+    go('lookup');
+  }, function(e){ toast('Save failed — check signal', true); });
+}
+
+/* ---------- ops dashboard ---------- */
+var SITES = [
+  { name: 'Workshop', type: 'HOLDING' },
+  { name: 'Cape Town', type: 'HOLDING' },
+  { name: 'Stellenbosch', type: 'SELLING' },
+  { name: 'Franschhoek', type: 'SELLING' }
+];
+var dashFilter = 'All';
+var STATUS_COLORS = { 'Available':'#1B7A3D', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Out of Service':'#D2141B', 'Other':'#888888' };
+var STATUS_LABELS = { 'Available':'Ready', 'Workshop':'On the bench', 'Waiting for parts':'Waiting for parts', 'Out of Service':'Out of service', 'Other':'Other' };
+
+function activeBikes_() { return DB.bikes.filter(function(b){ return b.active !== 'No'; }); }
+function bucketCat_(b) {
+  if (b.category === 'E-Bike') return 'E-Bike';
+  if (b.category === 'Kids') return 'Kids';
+  return 'Standard';
+}
+function bucketSize_(b) {
+  if (bucketCat_(b) === 'Kids') return b.wheelSize ? 'Kids ' + b.wheelSize : 'Kids';
+  return b.frameSize || 'Unsized';
+}
+function sizeOrder_(s) {
+  var order = ['XS','S','M','ML','L','XL'];
+  var i = order.indexOf(s);
+  if (i !== -1) return i;
+  if (/^[0-9.]+cm$/.test(s)) return 100 + parseFloat(s);
+  if (/^Kids/.test(s)) return 300 + (parseFloat(s.replace(/[^0-9.]+/g,'')) || 0);
+  if (s === 'Unsized') return 999;
+  return 200;
+}
+
+function renderDash() {
+  var bikes = activeBikes_();
+
+  /* headline */
+  var total = bikes.length;
+  var counts = {};
+  bikes.forEach(function(b){
+    var st = DB.statuses.indexOf(b.status) !== -1 ? b.status : 'Other';
+    counts[st] = (counts[st] || 0) + 1;
+  });
+  var ready = counts['Available'] || 0;
+  var pct = total ? Math.round(ready / total * 100) : 0;
+  var atHub = bikes.filter(function(b){
+    return b.status === 'Available' && (b.location === 'Workshop' || b.location === 'Cape Town');
+  }).length;
+  document.getElementById('d-pct').textContent = pct + '%';
+  document.getElementById('d-ready-sub').innerHTML =
+    ready + ' of ' + total + ' bikes' + (atHub ? '<br>' + atHub + ' ready but sitting at a hub' : '');
+  var bar = '', leg = '';
+  DB.statuses.forEach(function(st){
+    var n = counts[st] || 0;
+    if (n) bar += '<div style="width:' + (n / total * 100) + '%;background:' + STATUS_COLORS[st] + '"></div>';
+    leg += '<span><span class="dot" style="background:' + STATUS_COLORS[st] + '"></span>' +
+           (STATUS_LABELS[st] || st) + ' <b>' + n + '</b></span>';
+  });
+  document.getElementById('d-bar').innerHTML = bar;
+  document.getElementById('d-legend').innerHTML = leg;
+
+  /* filter chips */
+  var ff = document.getElementById('d-filters');
+  ff.innerHTML = '';
+  ['All','Standard','E-Bike','Kids'].forEach(function(f){
+    var b = document.createElement('button');
+    b.className = 'chip' + (f === dashFilter ? ' on' : '');
+    b.textContent = f;
+    b.onclick = function(){ dashFilter = f; renderDash(); };
+    ff.appendChild(b);
+  });
+
+  /* matrix */
+  var pool = bikes.filter(function(b){ return dashFilter === 'All' || bucketCat_(b) === dashFilter; });
+  var sizes = [];
+  pool.forEach(function(b){ var s = bucketSize_(b); if (sizes.indexOf(s) === -1) sizes.push(s); });
+  sizes.sort(function(a,b){ return sizeOrder_(a) - sizeOrder_(b); });
+
+  function cellBikes(size, site) {
+    return pool.filter(function(b){ return bucketSize_(b) === size && b.location === site; });
+  }
+  var html = '<table class="dash"><tr><th>Size</th>';
+  SITES.forEach(function(s){ html += '<th>' + s.name + '<small>' + s.type + '</small></th>'; });
+  html += '<th>Total</th></tr>';
+  var readyCol = {};
+  sizes.forEach(function(size){
+    var rowTotal = 0;
+    var cells = '';
+    SITES.forEach(function(site){
+      var here = cellBikes(size, site.name);
+      var r = here.filter(function(b){ return b.status === 'Available'; }).length;
+      var down = here.length - r;
+      rowTotal += here.length;
+      readyCol[site.name] = (readyCol[site.name] || 0) + r;
+      var cls = '';
+      if (site.type === 'SELLING') {
+        if (r === 0) cls = 'bad'; else if (r === 1) cls = 'warn';
+      }
+      cells += '<td class="' + cls + '" onclick="showCell(\'' + size.replace(/'/g,"\\'") + '\',\'' + site.name + '\')">' + r +
+               (down ? '<span class="down">' + down + ' down</span>' : '') + '</td>';
+    });
+    html += '<tr><td>' + size + '</td>' + cells + '<td><b>' + rowTotal + '</b></td></tr>';
+  });
+  html += '<tr class="total"><td>READY</td>';
+  var readyShown = 0;
+  SITES.forEach(function(s){ var n = readyCol[s.name] || 0; readyShown += n; html += '<td>' + n + '</td>'; });
+  html += '<td>' + readyShown + '</td></tr></table>';
+  document.getElementById('d-matrix').innerHTML = html;
+  document.getElementById('d-celllist').innerHTML = '';
+
+  /* gaps: selling site with no ready stock while another site has 2+ */
+  var gaps = '';
+  sizes.forEach(function(size){
+    SITES.filter(function(s){ return s.type === 'SELLING'; }).forEach(function(sell){
+      var here = cellBikes(size, sell.name).filter(function(b){ return b.status === 'Available'; }).length;
+      if (here !== 0) return;
+      var best = null;
+      SITES.forEach(function(src){
+        if (src.name === sell.name) return;
+        var n = cellBikes(size, src.name).filter(function(b){ return b.status === 'Available'; }).length;
+        if (n >= 2 && (!best || n > best.n)) best = { name: src.name, n: n };
+      });
+      if (best) {
+        var cat = dashFilter === 'All' ? '' : ' ' + dashFilter;
+        gaps += '<div class="gap"><b>' + size + cat + '</b><span>' + best.name + ' &rarr; ' + sell.name + '</span>' +
+                '<span class="why">' + sell.name + ' has none &middot; ' + best.name + ' has ' + best.n + '</span></div>';
+      }
+    });
+  });
+  document.getElementById('d-gaps').innerHTML = gaps || '<p class="note">No stock gaps at selling sites right now.</p>';
+
+  /* last movements */
+  var mv = '';
+  (DB.moves || []).forEach(function(m){
+    var when = m.when;
+    var d = new Date(m.when);
+    if (!isNaN(d)) {
+      var now = new Date();
+      var day = (d.toDateString() === now.toDateString()) ? 'Today'
+        : (d.toDateString() === new Date(now - 864e5).toDateString()) ? 'Yesterday'
+        : d.getDate() + '/' + (d.getMonth() + 1);
+      when = day + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    }
+    mv += '<div class="move"><b>' + m.assetId + '</b><div class="meta">' +
+          m.detail + ' &middot; ' + (m.by || '?') + ' &middot; ' + when + '</div></div>';
+  });
+  document.getElementById('d-moves').innerHTML = mv || '<p class="note">No movements logged yet &mdash; they appear here as soon as someone scans a bike to a new site.</p>';
+
+  /* footer note */
+  var noLoc = bikes.filter(function(b){ return !b.location; }).length;
+  var elsewhere = bikes.filter(function(b){
+    return b.location && b.location !== 'In Transit' && !SITES.some(function(s){ return s.name === b.location; });
+  });
+  var transit = bikes.filter(function(b){ return b.location === 'In Transit'; }).length;
+  var tagged = bikes.filter(function(b){ return b.barcode; }).length;
+  var bits = [total + ' active bikes', tagged + ' tagged'];
+  if (transit) bits.push(transit + ' in transit');
+  if (noLoc) bits.push(noLoc + ' with no location set');
+  if (elsewhere.length) bits.push(elsewhere.length + ' at unlisted locations');
+  document.getElementById('dash-note').textContent = bits.join(' \u00b7 ');
+}
+
+function showCell(size, site) {
+  var pool = activeBikes_().filter(function(b){
+    return (dashFilter === 'All' || bucketCat_(b) === dashFilter) &&
+           bucketSize_(b) === size && b.location === site;
+  });
+  var html = '<h2>' + size + ' at ' + site + '</h2>';
+  if (!pool.length) html += '<p class="note">Nothing here.</p>';
+  pool.forEach(function(b){
+    html += '<div class="move"><b>' + b.assetId + '</b><div class="meta">' +
+            [b.category, b.brand, b.colour, b.status].filter(Boolean).join(' \u00b7 ') + '</div></div>';
+  });
+  document.getElementById('d-celllist').innerHTML = html;
+}
+
+function refreshDash() {
+  apiGet(function(d){ DB = d; renderDash(); toast('Counts refreshed'); },
+         function(){ toast('Refresh failed — check signal', true); });
+}
+
+
+/* ---------- workshop job form ---------- */
+var JOB_WORK = ['Puncture','Brakes','Gears','Chain / drivetrain','Wheel true','Full service','Safety check','Other'];
+var JOB_MINS = ['15','30','45','60','90','120'];
+var OUTCOMES = [
+  { v:'Available', label:'Ready to ride', cls:'ready' },
+  { v:'Workshop', label:'On the bench', cls:'' },
+  { v:'Waiting for parts', label:'Waiting for parts', cls:'wait' },
+  { v:'Out of Service', label:'Out of service', cls:'oos' }
+];
+var job = { work: [], mins: '', outcome: '', parts: [] };
+
+function statusPill_(st) {
+  var o = null;
+  OUTCOMES.forEach(function(x){ if (x.v === st) o = x; });
+  return { label: o ? o.label : (st || 'No status'), cls: o ? o.cls : '' };
+}
+function fmtDate_(v) {
+  if (!v) return 'Never recorded';
+  var d = new Date(v);
+  if (isNaN(d)) return String(v);
+  return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+}
+
+function openJob(b, hist) {
+  current.bike = b;
+  job = { work: [], mins: '', outcome: '', parts: [] };
+  document.getElementById('j-code').textContent = current.code;
+  document.getElementById('j-num').textContent = b.assetId;
+  var p = statusPill_(b.status);
+  var pill = document.getElementById('j-pill');
+  pill.textContent = p.label; pill.className = 'pill ' + p.cls;
+  document.getElementById('j-loc').textContent = b.location || '\u2014';
+  document.getElementById('j-type').textContent = b.category || '\u2014';
+  document.getElementById('j-frame').textContent = b.frameSize || '\u2014';
+  document.getElementById('j-wheel').textContent = b.wheelSize || '\u2014';
+  document.getElementById('j-lastserv').textContent = fmtDate_(b.lastService);
+
+  var hh = '';
+  (hist || []).forEach(function(h){
+    hh += '<div class="hist"><span class="d">' + fmtDate_(h.when) + '</span><span><b>' +
+          h.work + '</b>' + (h.service ? ' \u00b7 service' : '') +
+          '<div class="m">' + [h.by, h.parts].filter(Boolean).join(' \u00b7 ') + '</div></span></div>';
+  });
+  document.getElementById('j-hist').innerHTML = hh ? '<div class="hist-title">Service history</div>' + hh : '';
+
+  document.getElementById('j-notes').value = '';
+  document.getElementById('j-parts').value = '';
+  document.getElementById('j-service').checked = false;
+
+  multiChips('j-work', JOB_WORK, function(sel){
+    job.work = sel;
+    document.getElementById('j-service').checked = sel.indexOf('Full service') !== -1;
+    jobSaveState();
+  });
+  chipRow('j-mins', JOB_MINS, '', function(v){ job.mins = v; jobSaveState(); });
+  multiChips('j-parts-chips', (DB.parts && DB.parts.length ? DB.parts : []), function(sel){
+    job.parts = sel; jobSaveState();
+  });
+  outcomeChips_();
+  jobSaveState();
+  show('view-job');
+}
+function outcomeChips_() {
+  var el = document.getElementById('j-outcome');
+  el.innerHTML = '';
+  OUTCOMES.forEach(function(o){
+    var b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = o.label;
+    b.onclick = function(){
+      Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
+      b.classList.add('on');
+      job.outcome = o.v; jobSaveState();
+    };
+    el.appendChild(b);
+  });
+}
+function multiChips(id, values, onChange) {
+  var el = document.getElementById(id);
+  el.innerHTML = '';
+  var sel = [];
+  values.forEach(function(v){
+    var b = document.createElement('button');
+    b.className = 'chip';
+    b.textContent = v;
+    b.onclick = function(){
+      var i = sel.indexOf(v);
+      if (i === -1) { sel.push(v); b.classList.add('on'); }
+      else { sel.splice(i, 1); b.classList.remove('on'); }
+      onChange(sel.slice());
+    };
+    el.appendChild(b);
+  });
+}
+function jobSaveState() {
+  var ok = (job.work.length || document.getElementById('j-notes').value.trim()) && job.outcome;
+  document.getElementById('j-save').disabled = !ok;
+}
+function saveJob() {
+  var notes = document.getElementById('j-notes').value.trim();
+  var work = job.work.join(' + ') + (notes ? (job.work.length ? ' \u2014 ' : '') + notes : '');
+  var extra = document.getElementById('j-parts').value.trim();
+  var parts = job.parts.slice();
+  if (extra) parts.push(extra);
+  var isService = document.getElementById('j-service').checked;
+  document.getElementById('j-save').disabled = true;
+  JOB_CALL({
+    barcode: current.code, work: work, minutes: job.mins, parts: parts.join(', '),
+    outcome: job.outcome, isService: isService, user: user
+  }, function(r){
+    if (r.notFound) { toast('Bike not found \u2014 rescan', true); return; }
+    current.bike.status = job.outcome;
+    if (isService) current.bike.lastService = new Date().toISOString();
+    toast(r.assetId + ' \u2014 job logged');
+    go('workshop');
+  }, function(){ toast('Save failed \u2014 check signal', true); jobSaveState(); });
+}
+document.getElementById('j-notes').addEventListener('input', jobSaveState);
+
+function LOOKUP_CALL(code, ok, err) { apiPost({ action: 'lookup', barcode: code }, ok, err); }
+function JOB_CALL(p, ok, err) { p.action = 'job'; apiPost(p, ok, err); }
+
+boot();
+</script>
+</body>
+</html>
