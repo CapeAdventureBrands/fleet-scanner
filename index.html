@@ -346,7 +346,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwc_gbkkAGA4qr-thACEdKikDpUzzL9hgdNnfjtDpACV9kG-JQ9kr2pZfN9nkmGvLTR/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbz1W8syu-0azWau462zXWTTrts1j1Ne573qASe-tiF6lloWfxvk3Mzuzd1knxBH_I7u/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -358,6 +358,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
+var UI_VERSION = 'B1';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -410,7 +411,10 @@ function paintRoles_() {
       : role === 'guide' ? 'Office &middot; locked tiles need a PIN'
       : role === 'workshop' ? 'Workshop access &middot; <a href="#" onclick="lockDown();return false">lock</a>'
       : 'Management access &middot; <a href="#" onclick="lockDown();return false">lock</a>';
-    n.innerHTML = base + ' &middot; <a href="#" onclick="switchSide();return false">switch</a>';
+    var sv = DB.version || '?';
+    var mism = (sv !== UI_VERSION) ? ' <b style="color:var(--red)">&mdash; server outdated, redeploy Code.gs</b>' : '';
+    n.innerHTML = base + ' &middot; <a href="#" onclick="switchSide();return false">switch</a>' +
+      ' &middot; app ' + UI_VERSION + ' / server ' + sv + mism;
   }
 }
 function switchSide() {
