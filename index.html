@@ -358,7 +358,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B1';
+var UI_VERSION = 'B2';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -513,12 +513,21 @@ function startScanner() {
   }
   document.getElementById('reader').style.display = 'block';
   scanner = new Html5Qrcode('reader', { formatsToSupport: FORMATS });
+  var hintTimer = setTimeout(function(){
+    var h = document.getElementById('scan-hint');
+    if (h) h.innerHTML = '<b>Struggling to read?</b> Move closer (10\u201315 cm), avoid glare \u2014 or just snap a photo below, it reads better on iPhone.';
+  }, 8000);
   scanner.start(
     { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 280, height: 140 } },
-    function(text) { onCode(text); },
+    { fps: 10,
+      qrbox: function(vw, vh){ return { width: Math.min(Math.floor(vw * 0.9), 340), height: 150 }; },
+      videoConstraints: { facingMode: 'environment',
+        width: { ideal: 1920 }, height: { ideal: 1080 },
+        advanced: [{ focusMode: 'continuous' }] } },
+    function(text) { clearTimeout(hintTimer); onCode(text); },
     function(){}
   ).catch(function(){
+    clearTimeout(hintTimer);
     // Live camera blocked here — hide the viewport, promote snap to primary
     document.getElementById('reader').style.display = 'none';
     var b = document.getElementById('snapbtn');
