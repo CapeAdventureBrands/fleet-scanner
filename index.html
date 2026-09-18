@@ -358,7 +358,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B4';
+var UI_VERSION = 'B5';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -610,7 +610,6 @@ function renderList() {
   var el = document.getElementById('bikelist');
   el.innerHTML = '';
   var pool = DB.bikes
-    .filter(function(b){ return b.active !== 'No'; })
     .filter(function(b){
       if (!q) return true;
       return (b.bikeNumber + ' ' + b.assetId + ' ' + b.category + ' ' + b.brand + ' ' + b.colour + ' ' + b.location)
@@ -619,14 +618,15 @@ function renderList() {
   var head = document.createElement('div');
   head.className = 'note';
   head.textContent = pool.length + ' bike' + (pool.length === 1 ? '' : 's') +
-    (q ? ' matching' : '') + ' \u00b7 retired (Active = No) bikes are hidden';
+    (q ? ' matching' : '') + ' \u00b7 whole register, retired included';
   el.appendChild(head);
   pool.forEach(function(b){
       var d = document.createElement('div');
       d.className = 'item';
       d.innerHTML = '<span class="num">' + (b.assetId || b.bikeNumber) + '</span>' +
         '<span class="meta">' + [b.category, b.brand, b.frameSize, b.location].filter(Boolean).join(' · ') + '</span>' +
-        (b.barcode ? '<span class="tagged">tagged</span>' : '');
+        (b.barcode ? '<span class="tagged">tagged</span>' : '') +
+        (b.active === 'No' ? '<span class="tagged" style="color:var(--red)">retired</span>' : '');
       d.onclick = function(){ confirmAssign(b, false); };
       el.appendChild(d);
     });
