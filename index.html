@@ -301,8 +301,10 @@
   <!-- TOUR HUB -->
   <section id="view-tour" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
-    <h2>Tour bikes</h2>
-    <div class="tiles">
+    <h2>Where is the tour?</h2>
+    <p class="note">Pick the site first. Scanning OUT marks bikes on tour there; scanning BACK IN returns them to this site &mdash; change it if the trailer drops them somewhere else.</p>
+    <div class="chips" id="t-loc"></div>
+    <div class="tiles" style="margin-top:16px">
       <button class="tile" onclick="go('tour-out')">
         <div class="big">Scan bikes OUT</div>
         <div class="sub">Taking them on tour now</div>
@@ -358,7 +360,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B5';
+var UI_VERSION = 'B6';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -485,13 +487,18 @@ function go(view) {
     tourSession = [];
     renderTourHub();
     show('view-tour');
+  } else if ((view === 'tour-out' || view === 'tour-in') && !tourLoc) {
+    toast('Pick the tour site first', true);
+    renderTourHub();
+    show('view-tour');
+    return;
   } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in') {
     mode = view;
     document.getElementById('scan-title').textContent =
       view === 'assign' ? 'Scan the sticker on the bike'
       : view === 'workshop' ? 'Scan the bike you worked on'
-      : view === 'tour-out' ? 'Scan each bike going on tour'
-      : view === 'tour-in' ? 'Scan each bike coming back' : 'Scan a bike';
+      : view === 'tour-out' ? 'Scan each bike going on tour \u2014 ' + tourLoc
+      : view === 'tour-in' ? 'Scan each bike coming back to ' + tourLoc : 'Scan a bike';
     document.getElementById('manual').value = '';
     var sb = document.getElementById('snapbtn');
     sb.className = 'quiet'; sb.style.marginTop = '10px';
@@ -578,7 +585,7 @@ function onCode(code) {
     show('view-pick');
   } else if (mode === 'tour-out' || mode === 'tour-in') {
     var dir = mode === 'tour-out' ? 'out' : 'in';
-    TOUR_CALL({ barcode: code, dir: dir, user: user }, function(r){
+    TOUR_CALL({ barcode: code, dir: dir, user: user, location: tourLoc }, function(r){
       if (!r || r.error || !r.assetId && !r.notFound && !r.blocked) {
         toast('Server is running old code \u2014 redeploy Code.gs (New version)', true); go('home'); return;
       }
@@ -586,7 +593,7 @@ function onCode(code) {
       if (r.blocked) { toast(r.assetId + ' is ' + r.status + ' \u2014 not tour-ready', true); go(mode); return; }
       if (r.already) { toast(r.assetId + ' is already out', true); go(mode); return; }
       tourSession.push(r.assetId);
-      toast(r.assetId + (dir === 'out' ? ' \u2014 out (' + tourSession.length + ' this tour)' : ' \u2014 back in'));
+      toast(r.assetId + (dir === 'out' ? ' \u2014 out at ' + tourLoc + ' (' + tourSession.length + ')' : ' \u2014 back in at ' + tourLoc));
       go(mode);            // straight back to the scanner \u2014 next bike
     }, function(){ toast('Save failed \u2014 check signal', true); go(mode); });
   } else if (mode === 'workshop') {
@@ -697,11 +704,26 @@ function openBike(b, faults) {
   document.getElementById('b-meta').textContent =
     [b.category, b.brand, b.frameSize, b.wheelSize, b.colour].filter(Boolean).join(' · ');
   document.getElementById('b-loc').textContent = b.location || '—';
-  document.getElementById('b-status').textContent = b.status || '—';
+  document.getElementById('b-status').textContent = statusPill_(b.status).label;
   chipRow('locs', DB.locations, b.location, function(v){ current.newLoc = v; updateSave(); });
-  chipRow('stats', DB.statuses, b.status, function(v){ current.newStatus = v; updateSave(); });
+  labelledStatusChips_('stats', b.status, function(v){ current.newStatus = v; updateSave(); });
   updateSave();
   show('view-bike');
+}
+function labelledStatusChips_(id, currentVal, onPick) {
+  var el = document.getElementById(id);
+  el.innerHTML = '';
+  OUTCOMES.forEach(function(o){
+    var b = document.createElement('button');
+    b.className = 'chip' + (o.v === currentVal ? ' on' : '');
+    b.textContent = o.label;
+    b.onclick = function(){
+      Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
+      b.classList.add('on');
+      onPick(o.v);
+    };
+    el.appendChild(b);
+  });
 }
 function chipRow(id, values, currentVal, onPick) {
   var el = document.getElementById(id);
@@ -743,7 +765,7 @@ var SITES = [
 ];
 var dashFilter = 'All';
 var STATUS_COLORS = { 'Available':'#1B7A3D', 'On tour':'#1D5FBF', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Out of Service':'#D2141B', 'Other':'#888888' };
-var STATUS_LABELS = { 'Available':'Ready', 'On tour':'On tour', 'Workshop':'On the bench', 'Waiting for parts':'Waiting for parts', 'Out of Service':'Out of service', 'Other':'Other' };
+var STATUS_LABELS = { 'Available':'Ready to ride', 'On tour':'On tour', 'Workshop':'On the bench', 'Waiting for parts':'Waiting for parts', 'Out of Service':'Out of service', 'Other':'Other' };
 
 function activeBikes_() { return DB.bikes.filter(function(b){ return b.active !== 'No'; }); }
 var ACCESSORY_CATS = ['Buggy', 'Baby seat', 'Trailer'];
@@ -883,7 +905,8 @@ function renderDash() {
         var items = byG[g];
         var d0 = new Date(items[0].when), since = '';
         if (!isNaN(d0)) since = ' \u00b7 since ' + ('0'+d0.getHours()).slice(-2) + ':' + ('0'+d0.getMinutes()).slice(-2);
-        th2 += '<div class="move"><b>' + g + '</b> \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') + since +
+        var site2 = items[0].location ? ' \u00b7 ' + items[0].location : '';
+        th2 += '<div class="move"><b>' + g + '</b>' + site2 + ' \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') + since +
                '<div class="meta">' + items.map(function(t){ return t.assetId; }).join(' \u00b7 ') + '</div></div>';
       });
       tEl.innerHTML = th2;
@@ -1073,7 +1096,24 @@ function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, er
 
 /* ---------- tour hub ---------- */
 var tourSession = [];
+var tourLoc = '';
+function renderTourLoc_() {
+  var el = document.getElementById('t-loc');
+  el.innerHTML = '';
+  DB.locations.filter(function(l){ return l !== 'In Transit'; }).forEach(function(l){
+    var b = document.createElement('button');
+    b.className = 'chip' + (l === tourLoc ? ' on' : '');
+    b.textContent = l;
+    b.onclick = function(){
+      tourLoc = l;
+      Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
+      b.classList.add('on');
+    };
+    el.appendChild(b);
+  });
+}
 function renderTourHub() {
+  renderTourLoc_();
   var el = document.getElementById('t-out');
   var list = DB.onTour || [];
   if (!list.length) { el.innerHTML = '<p class="note">Nothing out \u2014 all bikes are home.</p>'; return; }
@@ -1085,7 +1125,8 @@ function renderTourHub() {
     var since = '';
     var d = new Date(items[0].when);
     if (!isNaN(d)) since = ' \u00b7 since ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
-    h += '<div class="move"><b>' + g + '</b> \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') + since +
+    var site = items[0].location ? ' \u00b7 ' + items[0].location : '';
+    h += '<div class="move"><b>' + g + '</b>' + site + ' \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') + since +
          '<div class="meta">' + items.map(function(t){ return t.assetId; }).join(' \u00b7 ') + '</div></div>';
   });
   el.innerHTML = h;
