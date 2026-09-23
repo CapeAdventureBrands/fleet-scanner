@@ -348,7 +348,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwOZTWfMAFnrHTJ-VLpL4lmVArW1Hf8ZGBAB8Yt1KWHtg-wubjD-lWjXKukj7d_6LIV/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbyCt4DrL8KuFH51WBox05Hzn260JO04hhuXqiXOZF_iyZYfXCvMG-cHwJlVs8ZzeDd6/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -360,7 +360,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B6';
+var UI_VERSION = 'B7';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -419,6 +419,19 @@ function paintRoles_() {
       ' &middot; app ' + UI_VERSION + ' / server ' + sv + mism;
   }
 }
+function pickPerson_(nm, needs) {
+  var done = function(){
+    user = nm; localStorage.setItem('cab_user', nm);
+    if (side) go('home'); else show('view-side');
+  };
+  if (!needs) { done(); return; }
+  var c = window.prompt('Code for ' + nm + ':');
+  if (c === null) return;
+  PERSON_CALL(nm, c, function(r){
+    if (r.ok) { done(); }
+    else toast('Wrong code for ' + nm, true);
+  }, function(){ toast('Could not check code \u2014 signal?', true); });
+}
 function switchUser() {
   stopScanner();
   document.getElementById('whoami').innerHTML = '';
@@ -455,10 +468,12 @@ function boot() {
     var pp = document.getElementById('people');
     pp.innerHTML = '';
     d.people.forEach(function(p){
+      var nm = p.name || p;                       // tolerate old server (plain strings)
+      var needs = !!p.needsCode;
       var b = document.createElement('button');
-      b.className = 'chip red' + (p === user ? ' on' : '');
-      b.textContent = p;
-      b.onclick = function(){ user = p; localStorage.setItem('cab_user', p); if (side) go('home'); else show('view-side'); };
+      b.className = 'chip red' + (nm === user ? ' on' : '');
+      b.textContent = nm + (needs ? ' \ud83d\udd12' : '');
+      b.onclick = function(){ pickPerson_(nm, needs); };
       pp.appendChild(b);
     });
     if (user && side) go('home'); else if (user) show('view-side'); else show('view-who');
@@ -1088,6 +1103,7 @@ document.getElementById('j-notes').addEventListener('input', jobSaveState);
 
 function LOOKUP_CALL(code, ok, err) { apiPost({ action: 'lookup', barcode: code }, ok, err); }
 function AUTH_CALL(p, ok, err) { apiPost({ action: 'auth', pin: p }, ok, err); }
+function PERSON_CALL(name, code, ok, err) { apiPost({ action: 'person', name: name, code: code }, ok, err); }
 function FAULT_CALL(p, ok, err) { p.action = 'fault'; apiPost(p, ok, err); }
 function REPORT_CALL(days, ok, err) { apiPost({ action: 'report', days: days, pin: pin }, ok, err); }
 function TOUR_CALL(p, ok, err) { p.action = 'tour'; apiPost(p, ok, err); }
