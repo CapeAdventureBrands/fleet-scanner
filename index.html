@@ -199,6 +199,23 @@
              placeholder="Or type the number under the barcode">
       <button class="primary" onclick="manualGo()">Go</button>
     </div>
+    <button class="quiet" id="gtask-btn" style="width:100%;margin-top:14px;display:none" onclick="go('gtask')">
+      No bike involved? Log a general task
+    </button>
+  </section>
+
+  <!-- GENERAL TASK (workshop, no bike) -->
+  <section id="view-gtask" class="hidden">
+    <button class="back" onclick="go('workshop')">&#8249; Back to scanning</button>
+    <h2>What was the task?</h2>
+    <div class="chips" id="g-task"></div>
+    <input type="text" id="g-notes" placeholder="Detail — e.g. collected brake pads from CWC" style="margin-top:10px" autocomplete="off">
+    <h2>How long?</h2>
+    <div class="chips" id="g-mins"></div>
+    <div class="bar">
+      <button class="quiet" onclick="go('workshop')">Cancel</button>
+      <button class="primary" id="g-save" onclick="saveGtask()" disabled>Save task</button>
+    </div>
   </section>
 
   <!-- ASSIGN: pick bike -->
@@ -348,7 +365,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbyCt4DrL8KuFH51WBox05Hzn260JO04hhuXqiXOZF_iyZYfXCvMG-cHwJlVs8ZzeDd6/exec';
+var EXEC_URL = 'PASTE_YOUR_EXEC_URL_HERE';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -360,7 +377,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B7';
+var UI_VERSION = 'B8';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -457,7 +474,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -498,6 +515,9 @@ function go(view) {
   } else if (view === 'report') {
     loadReport(reportDays);
     show('view-report');
+  } else if (view === 'gtask') {
+    openGtask_();
+    show('view-gtask');
   } else if (view === 'tour') {
     tourSession = [];
     renderTourHub();
@@ -518,6 +538,8 @@ function go(view) {
     var sb = document.getElementById('snapbtn');
     sb.className = 'quiet'; sb.style.marginTop = '10px';
     sb.innerHTML = '&#128247; Snap the barcode (backup &mdash; testing)';
+    var gb = document.getElementById('gtask-btn');
+    if (gb) gb.style.display = (view === 'workshop') ? '' : 'none';
     show('view-scan');
     startScanner();
   }
@@ -980,7 +1002,7 @@ function refreshDash() {
 
 
 /* ---------- workshop job form ---------- */
-var JOB_WORK = ['Puncture','Brakes','Gears','Chain / drivetrain','Wheel true','Full service','Safety check','Other'];
+var JOB_WORK = ['Puncture','Brakes','Gears','Chain / drivetrain','Wheel true','Battery (reset)','Full service','Safety check','Other'];
 var JOB_MINS = ['15','30','45','60','90','120'];
 var OUTCOMES = [
   { v:'Available', label:'Ready to ride', cls:'ready' },
@@ -1107,6 +1129,7 @@ function PERSON_CALL(name, code, ok, err) { apiPost({ action: 'person', name: na
 function FAULT_CALL(p, ok, err) { p.action = 'fault'; apiPost(p, ok, err); }
 function REPORT_CALL(days, ok, err) { apiPost({ action: 'report', days: days, pin: pin }, ok, err); }
 function TOUR_CALL(p, ok, err) { p.action = 'tour'; apiPost(p, ok, err); }
+function GTASK_CALL(p, ok, err) { p.action = 'gtask'; p.pin = pin; apiPost(p, ok, err); }
 function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
 
@@ -1199,6 +1222,32 @@ function renderReport(jobs) {
   });
   document.getElementById('r-list').innerHTML = lh || '<p class="note">No jobs logged in this period.</p>';
 }
+/* ---------- general workshop task (no bike) ---------- */
+var GTASKS = ['Parts collection','Bike delivery','Bike movement','Marco Polo Tour','CPen Tour','Errand','Other'];
+var gtask = { task: '', mins: '' };
+function openGtask_() {
+  gtask = { task: '', mins: '' };
+  document.getElementById('g-notes').value = '';
+  chipRow('g-task', GTASKS, '', function(v){ gtask.task = v; gtaskState_(); });
+  chipRow('g-mins', JOB_MINS, '', function(v){ gtask.mins = v; gtaskState_(); });
+  gtaskState_();
+}
+function gtaskState_() {
+  var ok = gtask.task || document.getElementById('g-notes').value.trim();
+  document.getElementById('g-save').disabled = !ok;
+}
+function saveGtask() {
+  var notes = document.getElementById('g-notes').value.trim();
+  document.getElementById('g-save').disabled = true;
+  GTASK_CALL({ task: gtask.task, minutes: gtask.mins, notes: notes, user: user }, function(r){
+    if (r.denied) { toast('Workshop PIN needed — unlock on the home screen', true); gtaskState_(); return; }
+    if (r.error) { toast(r.error, true); gtaskState_(); return; }
+    toast('Task logged' + (gtask.task ? ' — ' + gtask.task : ''));
+    go('workshop');
+  }, function(){ toast('Save failed — check signal', true); gtaskState_(); });
+}
+document.getElementById('g-notes').addEventListener('input', gtaskState_);
+
 boot();
 </script>
 </body>
