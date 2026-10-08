@@ -91,6 +91,8 @@
   .pill.oos { background:#FBE3E4; color:var(--red); }
   .pill.wait { background:#FBF3DC; color:#8A6510; }
   .pill.tour { background:#E3ECFA; color:#1D5FBF; }
+  .pill.pend { background:#EFE6F7; color:#6E4A9E; }
+  .pill.ret { background:#EBEBEB; color:#555555; }
   .hist-title { font-size:11px; letter-spacing:.06em; color:var(--grey); font-weight:600; text-transform:uppercase; margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
   .hist { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
   .hist .d { color:var(--grey); font-size:12px; min-width:74px; }
@@ -365,7 +367,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwksMuCH5PtJPtmiCSB4gAr5TyrMxTuaxKgEqzOO3Fkw8HuJW5w6iXIigB07qXQbsME/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbx1rElzhqwqUYCiDnKzUepX04GGSWh00TM1hy64Y2UtxjExCLyNLazu4ebA1uDW1gUt/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -377,7 +379,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B8';
+var UI_VERSION = 'B9';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -801,8 +803,8 @@ var SITES = [
   { name: 'Franschhoek', type: 'SELLING' }
 ];
 var dashFilter = 'All';
-var STATUS_COLORS = { 'Available':'#1B7A3D', 'On tour':'#1D5FBF', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Out of Service':'#D2141B', 'Other':'#888888' };
-var STATUS_LABELS = { 'Available':'Ready to ride', 'On tour':'On tour', 'Workshop':'On the bench', 'Waiting for parts':'Waiting for parts', 'Out of Service':'Out of service', 'Other':'Other' };
+var STATUS_COLORS = { 'Available':'#1B7A3D', 'On tour':'#1D5FBF', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Pending':'#6E4A9E', 'Out of Service':'#D2141B', 'Retired':'#555555', 'Other':'#888888' };
+var STATUS_LABELS = { 'Available':'Ready to ride', 'On tour':'On tour', 'Workshop':'On the bench', 'Waiting for parts':'Waiting for parts', 'Pending':'Pending check', 'Out of Service':'Long-term down', 'Retired':'Retired', 'Other':'Other' };
 
 function activeBikes_() { return DB.bikes.filter(function(b){ return b.active !== 'No'; }); }
 var ACCESSORY_CATS = ['Buggy', 'Baby seat', 'Trailer'];
@@ -1009,7 +1011,9 @@ var OUTCOMES = [
   { v:'On tour', label:'On tour', cls:'tour' },
   { v:'Workshop', label:'On the bench', cls:'' },
   { v:'Waiting for parts', label:'Waiting for parts', cls:'wait' },
-  { v:'Out of Service', label:'Out of service', cls:'oos' }
+  { v:'Pending', label:'Pending check', cls:'pend' },
+  { v:'Out of Service', label:'Long-term down', cls:'oos' },
+  { v:'Retired', label:'Retired', cls:'ret' }
 ];
 var job = { work: [], mins: '', outcome: '', parts: [] };
 
