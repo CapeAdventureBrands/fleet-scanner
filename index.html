@@ -249,6 +249,9 @@
     <h2>Gaps worth moving on today</h2>
     <div id="d-gaps"></div>
 
+    <h2>Bikes down right now</h2>
+    <div id="d-down"></div>
+
     <h2>Out on tour right now</h2>
     <div id="d-tour"></div>
 
@@ -367,7 +370,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbx1rElzhqwqUYCiDnKzUepX04GGSWh00TM1hy64Y2UtxjExCLyNLazu4ebA1uDW1gUt/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbx5fyb4DLPYvkuVH1qstDAyc6IzB2NmoVjwYgyBRQYq6BpSjha6L2JEfws1JBOEoFPM/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -379,7 +382,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B9';
+var UI_VERSION = 'B10';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -931,6 +934,40 @@ function renderDash() {
   });
   document.getElementById('d-gaps').innerHTML = gaps || '<p class="note">No stock gaps at selling sites right now.</p>';
 
+  /* bikes down */
+  var DOWN_ORDER = ['Pending', 'Workshop', 'Waiting for parts', 'Out of Service'];
+  var dEl = document.getElementById('d-down');
+  if (dEl) {
+    var downBikes = bikes.filter(function(b){
+      return b.status !== 'Available' && b.status !== 'On tour' && b.status !== 'Retired';
+    });
+    if (!downBikes.length) dEl.innerHTML = '<p class="note">Nothing down — every active bike is rideable or on tour.</p>';
+    else {
+      function daysIn_(b) {
+        if (!b.statusChanged) return -1;
+        var d = new Date(b.statusChanged);
+        if (isNaN(d)) return -1;
+        return Math.floor((Date.now() - d.getTime()) / 864e5);
+      }
+      var dh = '';
+      var groups = DOWN_ORDER.slice();
+      downBikes.forEach(function(b){ if (groups.indexOf(b.status) === -1) groups.push(b.status); });
+      groups.forEach(function(st){
+        var here = downBikes.filter(function(b){ return b.status === st; });
+        if (!here.length) return;
+        here.sort(function(a,b){ return daysIn_(b) - daysIn_(a); });
+        dh += '<div class="hist-title">' + (STATUS_LABELS[st] || st || 'No status') + ' (' + here.length + ')</div>';
+        here.forEach(function(b){
+          var dd = daysIn_(b);
+          var age = dd < 0 ? '' : dd === 0 ? ' · today' : ' · ' + dd + ' day' + (dd === 1 ? '' : 's');
+          dh += '<div class="move"><b>' + b.assetId + '</b><div class="meta">' +
+                [b.category, b.location || 'no location'].filter(Boolean).join(' · ') + age + '</div></div>';
+        });
+      });
+      dEl.innerHTML = dh;
+    }
+  }
+
   /* out on tour */
   var tl = DB.onTour || [];
   var tEl = document.getElementById('d-tour');
@@ -1227,12 +1264,12 @@ function renderReport(jobs) {
   document.getElementById('r-list').innerHTML = lh || '<p class="note">No jobs logged in this period.</p>';
 }
 /* ---------- general workshop task (no bike) ---------- */
-var GTASKS = ['Parts collection','Bike delivery','Bike movement','Marco Polo Tour','CPen Tour','Errand','Other'];
+var GTASKS = ['Parts collection','Bike delivery','Bike movement','Marco Polo Tour','CPen Tour','Bites','On-site training (Warehouse)','On-site training (Stellenbosch)','Ops meeting','Errand','Other'];
 var gtask = { task: '', mins: '' };
 function openGtask_() {
   gtask = { task: '', mins: '' };
   document.getElementById('g-notes').value = '';
-  chipRow('g-task', GTASKS, '', function(v){ gtask.task = v; gtaskState_(); });
+  chipRow('g-task', (DB.tasks && DB.tasks.length ? DB.tasks : GTASKS), '', function(v){ gtask.task = v; gtaskState_(); });
   chipRow('g-mins', JOB_MINS, '', function(v){ gtask.mins = v; gtaskState_(); });
   gtaskState_();
 }
