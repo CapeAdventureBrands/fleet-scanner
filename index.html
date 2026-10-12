@@ -370,7 +370,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzNAgBlW9SWQ128wWgmBFHyIBVmuorRw2aFdJ_m8lmwxznduN80I2wFjy7eTxhyGRWW/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbx12tJsJ1rU05lNwUt4StlBrdiblDf0VLQBcOcSR4p5_DfWQDjrHAv3mM4brxKU-h2d/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -382,7 +382,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B11';
+var UI_VERSION = 'B12';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -484,22 +484,38 @@ function show(id) {
   });
 }
 
+function paintPeople_() {
+  var pp = document.getElementById('people');
+  pp.innerHTML = '';
+  (DB.people || []).forEach(function(p){
+    var nm = p.name || p;
+    var needs = !!p.needsCode;
+    var b = document.createElement('button');
+    b.className = 'chip red' + (nm === user ? ' on' : '');
+    b.textContent = nm + (needs ? ' \ud83d\udd12' : '');
+    b.onclick = function(){ pickPerson_(nm, needs); };
+    pp.appendChild(b);
+  });
+}
+function landing_() {
+  if (user && side) go('home'); else if (user) show('view-side'); else show('view-who');
+}
+function gotFresh_(d, hadCache) {
+  DB = d;
+  try { localStorage.setItem('cab_db', JSON.stringify(d)); } catch(e) {}
+  paintPeople_();
+  if (!hadCache) { landing_(); return; }
+  // already showing cached data: repaint quietly if the person is sitting on the home screen
+  var home = document.getElementById('view-home');
+  if (home && !home.classList.contains('hidden')) go('home');
+}
 function boot() {
-  apiGet(function(d){
-    DB = d;
-    var pp = document.getElementById('people');
-    pp.innerHTML = '';
-    d.people.forEach(function(p){
-      var nm = p.name || p;                       // tolerate old server (plain strings)
-      var needs = !!p.needsCode;
-      var b = document.createElement('button');
-      b.className = 'chip red' + (nm === user ? ' on' : '');
-      b.textContent = nm + (needs ? ' \ud83d\udd12' : '');
-      b.onclick = function(){ pickPerson_(nm, needs); };
-      pp.appendChild(b);
-    });
-    if (user && side) go('home'); else if (user) show('view-side'); else show('view-who');
-  }, function(e){ toast('Could not load register — check signal and reload', true); });
+  var cached = null;
+  try { cached = JSON.parse(localStorage.getItem('cab_db') || 'null'); } catch(e) {}
+  var hadCache = !!(cached && cached.bikes && cached.bikes.length);
+  if (hadCache) { DB = cached; paintPeople_(); landing_(); }
+  apiGet(function(d){ gotFresh_(d, hadCache); },
+    function(){ if (!hadCache) toast('Could not load register \u2014 check signal and reload', true); });
 }
 
 function go(view) {
@@ -567,7 +583,7 @@ function startScanner() {
     return;
   }
   document.getElementById('reader').style.display = 'block';
-  scanner = new Html5Qrcode('reader', { formatsToSupport: FORMATS });
+  scanner = new Html5Qrcode('reader', { formatsToSupport: FORMATS, experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
   var hintTimer = setTimeout(function(){
     var h = document.getElementById('scan-hint');
     if (h) h.innerHTML = '<b>Struggling to read?</b> Move closer (10\u201315 cm), avoid glare \u2014 or just snap a photo below, it reads better on iPhone.';
@@ -599,7 +615,7 @@ function snapDecode(input) {
   stopScanner();
   var FORMATS = formats_();
   if (!FORMATS) { toast('Scanner library not loaded — type the code instead', true); return; }
-  var d = new Html5Qrcode('reader', { formatsToSupport: FORMATS });
+  var d = new Html5Qrcode('reader', { formatsToSupport: FORMATS, experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
   document.getElementById('snapbtn').textContent = 'Reading…';
   d.scanFileV2(file, false).then(function(r){
     document.getElementById('snapbtn').innerHTML = document.getElementById('reader').style.display === 'none' ? '&#128247; Snap the barcode' : '&#128247; Snap the barcode (backup &mdash; testing)';
