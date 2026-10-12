@@ -342,7 +342,7 @@
 
   <!-- LOOKUP: bike card -->
   <section id="view-bike" class="hidden">
-    <button class="back" onclick="go('lookup')">‹ Scan another</button>
+    <button class="back" onclick="go(bikeFrom)" id="b-back">‹ Back</button>
     <div class="card">
       <div class="num" id="b-num"></div>
       <div class="meta" id="b-meta"></div>
@@ -370,7 +370,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbx5fyb4DLPYvkuVH1qstDAyc6IzB2NmoVjwYgyBRQYq6BpSjha6L2JEfws1JBOEoFPM/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzNAgBlW9SWQ128wWgmBFHyIBVmuorRw2aFdJ_m8lmwxznduN80I2wFjy7eTxhyGRWW/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -382,7 +382,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B10';
+var UI_VERSION = 'B11';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -648,6 +648,7 @@ function onCode(code) {
   } else {
     apiPost({ action: 'lookup', barcode: code }, function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet', true); go('lookup'); return; }
+      bikeFrom = 'lookup';
       openBike(r.bike, r.faults);
     }, function(e){ toast('Save failed — check signal', true); go('lookup'); });
   }
@@ -735,6 +736,25 @@ function sendFault() {
   }, function(){ document.getElementById('f-send').disabled = false; toast('Save failed — check signal', true); });
 }
 
+var bikeFrom = 'lookup';
+function faultsFor_(assetId) {
+  return (DB.faults || []).filter(function(f){ return f.assetId === assetId; });
+}
+function faultLine_(assetId) {
+  var ff = faultsFor_(assetId);
+  if (!ff.length) return '';
+  var extra = ff.length > 1 ? ' (+' + (ff.length - 1) + ' more)' : '';
+  return '<div class="meta" style="color:var(--red)">⚠ ' + ff[0].fault + extra + '</div>';
+}
+function openBikeByBarcode(bc, from) {
+  if (!bc) { toast('Not tagged yet — no barcode to open', true); return; }
+  bikeFrom = from || 'dash';
+  current.code = bc;
+  LOOKUP_CALL(bc, function(r){
+    if (r.notFound) { toast('Bike not found', true); return; }
+    openBike(r.bike, r.faults);
+  }, function(){ toast('Lookup failed — check signal', true); });
+}
 function openBike(b, faults) {
   current.bike = b; current.newLoc = ''; current.newStatus = '';
   current.faults = faults || [];
@@ -960,8 +980,8 @@ function renderDash() {
         here.forEach(function(b){
           var dd = daysIn_(b);
           var age = dd < 0 ? '' : dd === 0 ? ' · today' : ' · ' + dd + ' day' + (dd === 1 ? '' : 's');
-          dh += '<div class="move"><b>' + b.assetId + '</b><div class="meta">' +
-                [b.category, b.location || 'no location'].filter(Boolean).join(' · ') + age + '</div></div>';
+          dh += '<div class="move" style="cursor:pointer" onclick="openBikeByBarcode(\'' + (b.barcode || '') + '\',\'dash\')"><b>' + b.assetId + '</b><div class="meta">' +
+                [b.category, b.location || 'no location'].filter(Boolean).join(' · ') + age + '</div>' + faultLine_(b.assetId) + '</div>';
         });
       });
       dEl.innerHTML = dh;
@@ -1028,8 +1048,8 @@ function showCell(size, site) {
   var html = '<h2>' + size + ' at ' + site + '</h2>';
   if (!pool.length) html += '<p class="note">Nothing here.</p>';
   pool.forEach(function(b){
-    html += '<div class="move"><b>' + b.assetId + '</b><div class="meta">' +
-            [b.category, b.brand, b.colour, b.status].filter(Boolean).join(' \u00b7 ') + '</div></div>';
+    html += '<div class="move" style="cursor:pointer" onclick="openBikeByBarcode(\'' + (b.barcode || '') + '\',\'dash\')"><b>' + b.assetId + '</b><div class="meta">' +
+            [b.category, b.brand, b.colour, b.status].filter(Boolean).join(' \u00b7 ') + '</div>' + faultLine_(b.assetId) + '</div>';
   });
   document.getElementById('d-celllist').innerHTML = html;
 }
@@ -1041,7 +1061,7 @@ function refreshDash() {
 
 
 /* ---------- workshop job form ---------- */
-var JOB_WORK = ['Puncture','Brakes','Gears','Chain / drivetrain','Wheel true','Battery (reset)','Full service','Safety check','Other'];
+var JOB_WORK = ['Puncture','Brakes','Gears','Chain / drivetrain','Wheel true','Battery (reset)','Mechanical fault','Electrical fault','Full service','Safety check','Other'];
 var JOB_MINS = ['15','30','45','60','90','120'];
 var OUTCOMES = [
   { v:'Available', label:'Ready to ride', cls:'ready' },
