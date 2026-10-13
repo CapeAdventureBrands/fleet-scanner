@@ -252,6 +252,10 @@
     <h2>Bikes down right now</h2>
     <div id="d-down"></div>
 
+    <h2>Due for service</h2>
+    <p class="note">Bikes past 20 days on tour since their last service.</p>
+    <div id="d-due"></div>
+
     <h2>Out on tour right now</h2>
     <div id="d-tour"></div>
 
@@ -291,6 +295,10 @@
     <input type="text" id="j-parts" placeholder="Other parts (optional)" style="margin-top:10px" autocomplete="off">
     <h2>Where does it stand now?</h2>
     <div class="chips" id="j-outcome"></div>
+    <div id="j-partneed-wrap" style="display:none">
+      <h2>What part is needed?</h2>
+      <input type="text" id="j-partneed" placeholder="e.g. Bosch controller, 29&quot; rim — required" autocomplete="off">
+    </div>
     <label style="display:flex;align-items:center;gap:10px;margin-top:14px;font-size:14px">
       <input type="checkbox" id="j-service" style="width:20px;height:20px;accent-color:var(--red)">
       Counts as a service (stamps today as Last Service)
@@ -370,7 +378,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbx12tJsJ1rU05lNwUt4StlBrdiblDf0VLQBcOcSR4p5_DfWQDjrHAv3mM4brxKU-h2d/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxnVac2EeRqG8lwRNICnKfn8uq_duX1-Gi_dotTwKqQfgb5_bu-7fsGiOrR_3QVY9Zt/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -382,7 +390,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B12';
+var UI_VERSION = 'B13';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -524,8 +532,11 @@ function go(view) {
     ? 'Scanning as <b>' + user + '</b> \u00b7 <a href="#" onclick="switchUser();return false">not you?</a>' : '';
   if (view === 'home') {
     var tagged = DB.bikes.filter(function(b){ return b.barcode; }).length;
-    document.getElementById('progress').textContent =
-      tagged + ' of ' + DB.bikes.length + ' bikes tagged';
+    var mine = (DB.onTour || []).filter(function(t){ return t.guide === user; });
+    document.getElementById('progress').innerHTML =
+      tagged + ' of ' + DB.bikes.length + ' bikes tagged' +
+      (mine.length ? '<br><b style="color:var(--red)">⚠ You still have ' + mine.length + ' bike' +
+        (mine.length > 1 ? 's' : '') + ' out on tour — scan them back in</b>' : '');
     if (!side) { show('view-side'); return; }
     paintSide_();
     paintRoles_();
@@ -727,7 +738,7 @@ function renderFaults_(id, faults, forWorkshop) {
   var h = '';
   (faults || []).forEach(function(f){
     h += '<div class="fault"><b>' + f.fault + '</b><div class="m">' +
-         [f.by, fmtDate_(f.when)].filter(Boolean).join(' · ') +
+         [f.by, fmtDate_(f.when), openDays_(f.when)].filter(Boolean).join(' · ') +
          (forWorkshop ? ' · clears when a job sets it Ready to ride' : '') + '</div></div>';
   });
   el.innerHTML = h;
@@ -756,11 +767,25 @@ var bikeFrom = 'lookup';
 function faultsFor_(assetId) {
   return (DB.faults || []).filter(function(f){ return f.assetId === assetId; });
 }
+function openDays_(when) {
+  if (!when) return '';
+  var d = new Date(when);
+  if (isNaN(d)) return '';
+  var n = Math.floor((Date.now() - d.getTime()) / 864e5);
+  return n <= 0 ? 'logged today' : 'open ' + n + ' day' + (n === 1 ? '' : 's');
+}
 function faultLine_(assetId) {
   var ff = faultsFor_(assetId);
   if (!ff.length) return '';
   var extra = ff.length > 1 ? ' (+' + (ff.length - 1) + ' more)' : '';
-  return '<div class="meta" style="color:var(--red)">⚠ ' + ff[0].fault + extra + '</div>';
+  var age = openDays_(ff[0].when);
+  return '<div class="meta" style="color:var(--red)">⚠ ' + ff[0].fault + extra + (age ? ' · ' + age : '') + '</div>';
+}
+function partLine_(assetId) {
+  var pp = (DB.partsNeeded || []).filter(function(p){ return p.assetId === assetId; });
+  if (!pp.length) return '';
+  var age = openDays_(pp[0].when).replace('open ', 'waiting ').replace('logged today', 'since today');
+  return '<div class="meta" style="color:#8A6510">🔧 needs: ' + pp[0].part + (age ? ' · ' + age : '') + '</div>';
 }
 function openBikeByBarcode(bc, from) {
   if (!bc) { toast('Not tagged yet — no barcode to open', true); return; }
@@ -997,10 +1022,27 @@ function renderDash() {
           var dd = daysIn_(b);
           var age = dd < 0 ? '' : dd === 0 ? ' · today' : ' · ' + dd + ' day' + (dd === 1 ? '' : 's');
           dh += '<div class="move" style="cursor:pointer" onclick="openBikeByBarcode(\'' + (b.barcode || '') + '\',\'dash\')"><b>' + b.assetId + '</b><div class="meta">' +
-                [b.category, b.location || 'no location'].filter(Boolean).join(' · ') + age + '</div>' + faultLine_(b.assetId) + '</div>';
+                [b.category, b.location || 'no location'].filter(Boolean).join(' · ') + age + '</div>' + faultLine_(b.assetId) + partLine_(b.assetId) + '</div>';
         });
       });
       dEl.innerHTML = dh;
+    }
+  }
+
+  /* due for service */
+  var dueEl = document.getElementById('d-due');
+  if (dueEl) {
+    var due = bikes.filter(function(b){ return b.serviceDue; });
+    if (!due.length) dueEl.innerHTML = '<p class="note">Nothing due — no bike has passed the tour-days threshold.</p>';
+    else {
+      due.sort(function(a, b2){ return (b2.tourDays || 0) - (a.tourDays || 0); });
+      var duh = '';
+      due.forEach(function(b){
+        duh += '<div class="move" style="cursor:pointer" onclick="openBikeByBarcode(\'' + (b.barcode || '') + '\',\'dash\')"><b>' + b.assetId +
+               '</b> <span class="pill oos" style="font-size:10px;padding:2px 8px">' + b.tourDays + ' tour days</span>' +
+               '<div class="meta">' + [b.category, b.location, 'last service: ' + (b.lastService ? fmtDate_(b.lastService) : 'never recorded')].filter(Boolean).join(' · ') + '</div></div>';
+      });
+      dueEl.innerHTML = duh;
     }
   }
 
@@ -1128,6 +1170,8 @@ function openJob(b, hist) {
   document.getElementById('j-notes').value = '';
   document.getElementById('j-parts').value = '';
   document.getElementById('j-service').checked = false;
+  document.getElementById('j-partneed').value = '';
+  document.getElementById('j-partneed-wrap').style.display = 'none';
 
   multiChips('j-work', JOB_WORK, function(sel){
     job.work = sel;
@@ -1152,7 +1196,10 @@ function outcomeChips_() {
     b.onclick = function(){
       Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
       b.classList.add('on');
-      job.outcome = o.v; jobSaveState();
+      job.outcome = o.v;
+      var w = document.getElementById('j-partneed-wrap');
+      if (w) w.style.display = (o.v === 'Waiting for parts') ? '' : 'none';
+      jobSaveState();
     };
     el.appendChild(b);
   });
@@ -1176,6 +1223,7 @@ function multiChips(id, values, onChange) {
 }
 function jobSaveState() {
   var ok = (job.work.length || document.getElementById('j-notes').value.trim()) && job.outcome;
+  if (job.outcome === 'Waiting for parts' && !document.getElementById('j-partneed').value.trim()) ok = false;
   document.getElementById('j-save').disabled = !ok;
 }
 function saveJob() {
@@ -1188,7 +1236,8 @@ function saveJob() {
   document.getElementById('j-save').disabled = true;
   JOB_CALL({
     barcode: current.code, work: work, minutes: job.mins, parts: parts.join(', '),
-    outcome: job.outcome, isService: isService, user: user
+    outcome: job.outcome, isService: isService, user: user,
+    partsNeeded: document.getElementById('j-partneed').value.trim()
   }, function(r){
     if (r.denied) { toast('Workshop PIN needed \u2014 unlock on the home screen', true); jobSaveState(); return; }
     if (r.notFound) { toast('Bike not found \u2014 rescan', true); return; }
@@ -1199,6 +1248,7 @@ function saveJob() {
   }, function(){ toast('Save failed \u2014 check signal', true); jobSaveState(); });
 }
 document.getElementById('j-notes').addEventListener('input', jobSaveState);
+document.getElementById('j-partneed').addEventListener('input', jobSaveState);
 
 function LOOKUP_CALL(code, ok, err) { apiPost({ action: 'lookup', barcode: code }, ok, err); }
 function AUTH_CALL(p, ok, err) { apiPost({ action: 'auth', pin: p }, ok, err); }
