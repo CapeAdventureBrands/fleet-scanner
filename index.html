@@ -378,7 +378,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxnVac2EeRqG8lwRNICnKfn8uq_duX1-Gi_dotTwKqQfgb5_bu-7fsGiOrR_3QVY9Zt/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxUfewjAN8Kk9EQlxXkUFOsIMJaIvysYuRPA09_NtmIo839zQc7QxdZRcLaHjYyq-2V/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -390,7 +390,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B13';
+var UI_VERSION = 'B14';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -877,6 +877,7 @@ function bucketCat_(b) {
   return b.category || 'Uncategorised';
 }
 function bucketSize_(b) {
+  if (ACCESSORY_CATS.indexOf(b.category) !== -1) return b.category;  // Buggy / Baby seat rows, not "Unsized"
   if (bucketCat_(b) === 'Kids') return b.wheelSize ? 'Kids ' + b.wheelSize : 'Kids';
   return b.frameSize || 'Unsized';
 }
@@ -886,6 +887,9 @@ function sizeOrder_(s) {
   if (i !== -1) return i;
   if (/^[0-9.]+cm$/.test(s)) return 100 + parseFloat(s);
   if (/^Kids/.test(s)) return 300 + (parseFloat(s.replace(/[^0-9.]+/g,'')) || 0);
+  if (s === 'Baby seat') return 400;
+  if (s === 'Buggy') return 401;
+  if (s === 'Trailer') return 402;
   if (s === 'Unsized') return 999;
   return 200;
 }
