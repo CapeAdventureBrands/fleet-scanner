@@ -378,7 +378,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwIJwaTbvjnFLtuztMBYq803pm6kf29As4tNwFFDy-6LRkBEuX_2RBEdtKASpqEKoaj/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzci5prtabAdj9BAZn9dm9UMh8lCYgKBUkuc4fcj-JAgVxkrpdu-bPT0aE2mx9SkO8/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -390,7 +390,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B16';
+var UI_VERSION = 'B17';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -1297,6 +1297,7 @@ function renderTourLoc_() {
   });
 }
 function renderTourHub(fresh) {
+  renderTourLoc_();
   var el = document.getElementById('t-out');
   var list = DB.onTour || [];
   if (!list.length) {
