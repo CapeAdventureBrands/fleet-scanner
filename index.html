@@ -378,7 +378,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxUfewjAN8Kk9EQlxXkUFOsIMJaIvysYuRPA09_NtmIo839zQc7QxdZRcLaHjYyq-2V/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwIJwaTbvjnFLtuztMBYq803pm6kf29As4tNwFFDy-6LRkBEuX_2RBEdtKASpqEKoaj/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -390,7 +390,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B14';
+var UI_VERSION = 'B16';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -513,9 +513,13 @@ function gotFresh_(d, hadCache) {
   try { localStorage.setItem('cab_db', JSON.stringify(d)); } catch(e) {}
   paintPeople_();
   if (!hadCache) { landing_(); return; }
-  // already showing cached data: repaint quietly if the person is sitting on the home screen
-  var home = document.getElementById('view-home');
-  if (home && !home.classList.contains('hidden')) go('home');
+  repaintVisible_();
+}
+function repaintVisible_() {
+  function vis(id){ var e = document.getElementById(id); return e && !e.classList.contains('hidden'); }
+  if (vis('view-home')) go('home');
+  else if (vis('view-dash')) renderDash();
+  else if (vis('view-tour')) renderTourHub(true);
 }
 function boot() {
   var cached = null;
@@ -661,6 +665,16 @@ function onCode(code) {
       if (r.notFound) { toast('No bike carries ' + code + ' \u2014 assign it first', true); go(mode); return; }
       if (r.blocked) { toast(r.assetId + ' is ' + r.status + ' \u2014 not tour-ready', true); go(mode); return; }
       if (r.already) { toast(r.assetId + ' is already out', true); go(mode); return; }
+      DB.onTour = (DB.onTour || []).filter(function(t){ return t.assetId !== r.assetId; });
+      if (dir === 'out') DB.onTour.push({ assetId: r.assetId, guide: user, when: new Date().toISOString(), location: tourLoc });
+      (DB.bikes || []).some(function(b){
+        if (b.assetId === r.assetId) {
+          b.status = dir === 'out' ? 'On tour' : 'Available';
+          if (tourLoc) b.location = tourLoc;
+          return true;
+        }
+      });
+      try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
       tourSession.push(r.assetId);
       toast(r.assetId + (dir === 'out' ? ' \u2014 out at ' + tourLoc + ' (' + tourSession.length + ')' : ' \u2014 back in at ' + tourLoc));
       go(mode);            // straight back to the scanner \u2014 next bike
@@ -1282,26 +1296,30 @@ function renderTourLoc_() {
     el.appendChild(b);
   });
 }
-function renderTourHub() {
-  renderTourLoc_();
+function renderTourHub(fresh) {
   var el = document.getElementById('t-out');
   var list = DB.onTour || [];
-  if (!list.length) { el.innerHTML = '<p class="note">Nothing out \u2014 all bikes are home.</p>'; return; }
-  var byGuide = {};
-  list.forEach(function(t){ (byGuide[t.guide || '?'] = byGuide[t.guide || '?'] || []).push(t); });
-  var h = '';
-  Object.keys(byGuide).sort().forEach(function(g){
-    var items = byGuide[g];
-    var since = '';
-    var d = new Date(items[0].when);
-    if (!isNaN(d)) since = ' \u00b7 since ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
-    var site = items[0].location ? ' \u00b7 ' + items[0].location : '';
-    h += '<div class="move"><b>' + g + '</b>' + site + ' \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') + since +
-         '<div class="meta">' + items.map(function(t){ return t.assetId; }).join(' \u00b7 ') + '</div></div>';
+  if (!list.length) {
+    el.innerHTML = '<p class="note">Nothing out \u2014 all bikes are home.</p>';
+  } else {
+    var byGuide = {};
+    list.forEach(function(t){ (byGuide[t.guide || '?'] = byGuide[t.guide || '?'] || []).push(t); });
+    var h = '';
+    Object.keys(byGuide).sort().forEach(function(g){
+      var items = byGuide[g];
+      var since = '';
+      var d = new Date(items[0].when);
+      if (!isNaN(d)) since = ' \u00b7 since ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+      var site = items[0].location ? ' \u00b7 ' + items[0].location : '';
+      h += '<div class="move"><b>' + g + '</b>' + site + ' \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') + since +
+           '<div class="meta">' + items.map(function(t){ return t.assetId; }).join(' \u00b7 ') + '</div></div>';
+    });
+    el.innerHTML = h;
+  }
+  if (!fresh) REFRESH_DATA(function(){
+    var v = document.getElementById('view-tour');
+    if (v && !v.classList.contains('hidden')) renderTourHub(true);
   });
-  el.innerHTML = h;
-  // refresh from server so the list is current, not cached
-  REFRESH_DATA(function(){ if (!document.getElementById('view-tour').classList.contains('hidden')) {} });
 }
 
 /* ---------- workshop report ---------- */
