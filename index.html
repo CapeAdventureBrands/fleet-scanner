@@ -169,6 +169,10 @@
         <div class="big">Log workshop work <span class="lock">&#128274;</span></div>
         <div class="sub">Scan the bike, record what you did and what you used</div>
       </button>
+      <button class="tile" onclick="requireRole('workshop','order')" id="tile-order">
+        <div class="big">Order parts <span class="lock">&#128274;</span></div>
+        <div class="sub">Parts the workshop needs — emailed daily until received</div>
+      </button>
       <button class="tile" onclick="requireRole('admin','dash')" id="tile-dash">
         <div class="big">Location dashboard <span class="lock">&#128274;</span></div>
         <div class="sub">Live counts by site and status</div>
@@ -328,6 +332,18 @@
     <div id="r-list"></div>
   </section>
 
+  <!-- ORDER PARTS -->
+  <section id="view-order" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Order a part</h2>
+    <div class="chips" id="o-chips"></div>
+    <input type="text" id="o-text" placeholder="Part, quantity, detail — e.g. 29&quot; tubes x10" autocomplete="off" style="margin-top:10px">
+    <button class="primary" style="width:100%;margin-top:10px" id="o-add" onclick="addOrder()">Add to order list</button>
+    <h2>Waiting to arrive</h2>
+    <p class="note">Emailed daily until marked received. Tap an item when it arrives.</p>
+    <div id="o-list"></div>
+  </section>
+
   <!-- TOUR HUB -->
   <section id="view-tour" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
@@ -378,7 +394,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzci5prtabAdj9BAZn9dm9UMh8lCYgKBUkuc4fcj-JAgVxkrpdu-bPT0aE2mx9SkO8/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzbF1Ms2jqOHEjgPPjCwNMEOiTXJSFc9cXVlLmVDONSiMZtL6x3RxEkkYEJDDN4oUCu/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -390,7 +406,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B17';
+var UI_VERSION = 'B18';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -406,6 +422,7 @@ function paintSide_() {
     'tile-lookup': true,
     'tile-tour': side !== 'office',
     'tile-workshop': showOffice,
+    'tile-order': showOffice,
     'tile-dash': showOffice,
     'tile-report': showOffice,
     'tile-assign': showOffice
@@ -435,6 +452,8 @@ function paintRoles_() {
       a = document.getElementById('tile-assign'), rp = document.getElementById('tile-report');
   if (rp) rp.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
   if (w) w.className = 'tile' + (roleRank_(role) >= 1 ? ' open' : '');
+  var od = document.getElementById('tile-order');
+  if (od) od.className = 'tile' + (roleRank_(role) >= 1 ? ' open' : '');
   if (d) d.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
   if (a) a.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
   var n = document.getElementById('role-note');
@@ -487,7 +506,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -551,6 +570,9 @@ function go(view) {
   } else if (view === 'report') {
     loadReport(reportDays);
     show('view-report');
+  } else if (view === 'order') {
+    renderOrder_();
+    show('view-order');
   } else if (view === 'gtask') {
     openGtask_();
     show('view-gtask');
@@ -1085,6 +1107,22 @@ function renderDash() {
     }
   }
 
+  /* bikes marked On tour with no tour record */
+  if (tEl) {
+    var tourIds = {};
+    (DB.onTour || []).forEach(function(t){ tourIds[t.assetId] = true; });
+    var ghosts = bikes.filter(function(b){ return b.status === 'On tour' && !tourIds[b.assetId]; });
+    if (ghosts.length) {
+      var gh = '<div class="fault"><b>\u26a0 ' + ghosts.length + ' marked On tour with no tour record</b>' +
+               '<div class="m">Tap the bike \u00b7 Set status \u2192 Ready to ride clears it</div></div>';
+      ghosts.forEach(function(b){
+        gh += '<div class="move" style="cursor:pointer" onclick="openBikeByBarcode(\'' + (b.barcode || '') + '\',\'dash\')"><b>' + b.assetId +
+              '</b><div class="meta">' + [b.category, b.location].filter(Boolean).join(' \u00b7 ') + '</div></div>';
+      });
+      tEl.innerHTML += gh;
+    }
+  }
+
   /* last movements */
   var mv = '';
   (DB.moves || []).forEach(function(m){
@@ -1275,6 +1313,8 @@ function FAULT_CALL(p, ok, err) { p.action = 'fault'; apiPost(p, ok, err); }
 function REPORT_CALL(days, ok, err) { apiPost({ action: 'report', days: days, pin: pin }, ok, err); }
 function TOUR_CALL(p, ok, err) { p.action = 'tour'; apiPost(p, ok, err); }
 function GTASK_CALL(p, ok, err) { p.action = 'gtask'; p.pin = pin; apiPost(p, ok, err); }
+function ORDER_CALL(part, ok, err) { apiPost({ action: 'orderpart', part: part, user: user, pin: pin }, ok, err); }
+function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, user: user, pin: pin }, ok, err); }
 function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
 
@@ -1321,6 +1361,53 @@ function renderTourHub(fresh) {
     var v = document.getElementById('view-tour');
     if (v && !v.classList.contains('hidden')) renderTourHub(true);
   });
+}
+
+/* ---------- order parts (workshop) ---------- */
+var orderPick = '';
+function renderOrder_() {
+  orderPick = '';
+  document.getElementById('o-text').value = '';
+  chipRow('o-chips', (DB.parts && DB.parts.length ? DB.parts : []), '', function(v){ orderPick = v; });
+  var el = document.getElementById('o-list');
+  var open = DB.partsNeeded || [];
+  if (!open.length) { el.innerHTML = '<p class="note">Nothing outstanding.</p>'; return; }
+  var h = '';
+  open.forEach(function(p){
+    var age = openDays_(p.when).replace('open ', 'waiting ').replace('logged today', 'added today');
+    var tag = p.assetId === 'Stock' ? 'stock order' : 'for ' + p.assetId;
+    h += '<div class="move" style="cursor:pointer" onclick="doneOrder(' + p.row + ',\'' + String(p.part).replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\')">' +
+         '<b>' + p.part + '</b><div class="meta">' + [tag, p.by, age].filter(Boolean).join(' \u00b7 ') + '</div></div>';
+  });
+  el.innerHTML = h;
+}
+function addOrder() {
+  var txt = document.getElementById('o-text').value.trim();
+  var part = [orderPick, txt].filter(Boolean).join(' \u2014 ');
+  if (!part) { toast('Pick a part or type one first', true); return; }
+  document.getElementById('o-add').disabled = true;
+  ORDER_CALL(part, function(r){
+    document.getElementById('o-add').disabled = false;
+    if (r.denied) { toast('Workshop PIN needed \u2014 unlock on the home screen', true); return; }
+    if (r.error) { toast(r.error, true); return; }
+    (DB.partsNeeded = DB.partsNeeded || []).unshift({ row: -1, assetId: 'Stock', part: part, by: user, when: new Date().toISOString() });
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast('On the order list \u2014 ' + part);
+    REFRESH_DATA(function(){ var v = document.getElementById('view-order'); if (v && !v.classList.contains('hidden')) renderOrder_(); });
+    renderOrder_();
+  }, function(){ document.getElementById('o-add').disabled = false; toast('Save failed \u2014 check signal', true); });
+}
+function doneOrder(row, label) {
+  if (row < 2) { toast('Just added \u2014 give it a second, then refresh', true); return; }
+  if (!confirm('Mark "' + label + '" as received / no longer needed?')) return;
+  PARTDONE_CALL(row, function(r){
+    if (r.denied) { toast('Workshop PIN needed', true); return; }
+    if (r.error) { toast(r.error, true); return; }
+    DB.partsNeeded = (DB.partsNeeded || []).filter(function(p){ return p.row !== row; });
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast('Done \u2014 ' + label);
+    renderOrder_();
+  }, function(){ toast('Save failed \u2014 check signal', true); });
 }
 
 /* ---------- workshop report ---------- */
