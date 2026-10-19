@@ -116,6 +116,12 @@
   .move { padding:9px 2px; border-bottom:1px solid var(--line); font-size:13px; }
   .move b { font-family:'Montserrat',sans-serif; }
   .move .meta { color:var(--grey); font-size:12px; }
+  table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
+  table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
+  table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
+  table.parts tr { cursor:pointer; }
+  table.parts td.prio-u { color:var(--red); font-weight:700; }
+  table.parts td.prio-s { color:#8A6510; font-weight:600; }
   .lock { font-size:14px; }
   .tile.open .lock { display:none; }
   .fault { border:2px solid var(--red); background:#FBE3E4; padding:10px 12px; margin-top:12px; font-size:13px; }
@@ -405,7 +411,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwilAxxkgZ2Jv2v4jETIhfyGI6_E3X5xZ1JA-tgXnNthQJV8NXshPuaQICwpyl46GSx/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbyfCKvYyToOQbDe1ulKxU2B3lzPbDptS-j1ncy1RNd04GXhaBhbnidoawePAsDxE4BJ/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -417,7 +423,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B20';
+var UI_VERSION = 'B21';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -1414,18 +1420,28 @@ function renderOrder_() {
   var el = document.getElementById('o-list');
   var open = DB.partsNeeded || [];
   if (!open.length) { el.innerHTML = '<p class="note">Nothing outstanding.</p>'; return; }
-  var h = '';
-  open.forEach(function(p){
-    var age = openDays_(p.when).replace('open ', 'waiting ').replace('logged today', 'added today');
-    var tag = p.assetId === 'Stock' ? 'stock order' : 'for ' + p.assetId;
-    var prioBadge = p.priority === 'Urgent' ? ' <span class="pill oos" style="font-size:10px;padding:2px 8px">Urgent</span>'
-      : p.priority === 'Soon' ? ' <span class="pill wait" style="font-size:10px;padding:2px 8px">Soon</span>' : '';
-    h += '<div class="move" style="cursor:pointer" onclick="doneOrder(' + p.row + ',\'' + String(p.part).replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\')">' +
-         '<b>' + p.part + (p.qty ? ' \u00d7' + p.qty : '') + '</b>' + prioBadge +
-         '<div class="meta">' + [p.brand, tag, p.by, age].filter(Boolean).join(' \u00b7 ') +
-         (p.photo ? ' \u00b7 <a href="' + p.photo + '" target="_blank" onclick="event.stopPropagation()">\ud83d\udcf7 photo</a>' : '') + '</div>' +
-         (p.notes ? '<div class="meta">' + p.notes + '</div>' : '') + '</div>';
+  var rank = { 'Urgent': 0, 'Soon': 1 };
+  open = open.slice().sort(function(a, b){
+    var ra = (a.priority in rank) ? rank[a.priority] : 2;
+    var rb = (b.priority in rank) ? rank[b.priority] : 2;
+    return ra - rb;
   });
+  var h = '<div style="overflow-x:auto"><table class="parts">' +
+          '<tr><th>Part</th><th>Qty</th><th>Priority</th><th>Brand</th><th>Notes</th></tr>';
+  open.forEach(function(p){
+    var age = openDays_(p.when).replace('open ', '').replace('logged today', 'today');
+    var tag = p.assetId === 'Stock' ? '' : 'for ' + p.assetId + ' \u00b7 ';
+    var pc = p.priority === 'Urgent' ? ' class="prio-u"' : p.priority === 'Soon' ? ' class="prio-s"' : '';
+    h += '<tr onclick="doneOrder(' + p.row + ',\'' + String(p.part).replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\')">' +
+         '<td><b>' + p.part + '</b>' +
+         (p.photo ? ' <a href="' + p.photo + '" target="_blank" onclick="event.stopPropagation()">\ud83d\udcf7</a>' : '') +
+         '<div class="meta">' + tag + [p.by, age].filter(Boolean).join(' \u00b7 ') + '</div></td>' +
+         '<td>' + (p.qty || '') + '</td>' +
+         '<td' + pc + '>' + (p.priority || '') + '</td>' +
+         '<td>' + (p.brand || '') + '</td>' +
+         '<td>' + (p.notes || '') + '</td></tr>';
+  });
+  h += '</table></div>';
   el.innerHTML = h;
 }
 function addOrder() {
