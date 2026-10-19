@@ -337,7 +337,15 @@
     <button class="back" onclick="go('home')">&#8249; Back</button>
     <h2>Order a part</h2>
     <div class="chips" id="o-chips"></div>
-    <input type="text" id="o-text" placeholder="Part, quantity, detail — e.g. 29&quot; tubes x10" autocomplete="off" style="margin-top:10px">
+    <input type="text" id="o-text" placeholder="Part name (if not in the list above)" autocomplete="off" style="margin-top:10px">
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+      <input type="number" id="o-qty" min="1" value="1" style="width:84px;font:16px 'Inter',sans-serif;padding:12px;border:2px solid var(--black);border-radius:0">
+      <span class="note" style="margin:0">qty</span>
+    </div>
+    <h2>Priority</h2>
+    <div class="chips" id="o-prio"></div>
+    <input type="text" id="o-brand" placeholder="Brand / spec (optional) — e.g. Shimano" autocomplete="off" style="margin-top:10px">
+    <input type="text" id="o-notes" placeholder="Notes (optional) — e.g. Clint ordered on his account last time" autocomplete="off" style="margin-top:10px">
     <input type="file" id="o-photo" accept="image/*" capture="environment" class="hidden" onchange="orderPhotoPicked(this)">
     <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('o-photo').click()">&#128247; Add a photo of the part</button>
     <p class="note" id="o-photo-note"></p>
@@ -397,7 +405,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbytCjVTiH9OZ2pdNtWTnJMqGuqODLEPUJifFsIuaSf4NvwsNGhlqm-8n6ywMDqWtNNz/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwilAxxkgZ2Jv2v4jETIhfyGI6_E3X5xZ1JA-tgXnNthQJV8NXshPuaQICwpyl46GSx/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -409,7 +417,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B19';
+var UI_VERSION = 'B20';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -1316,7 +1324,7 @@ function FAULT_CALL(p, ok, err) { p.action = 'fault'; apiPost(p, ok, err); }
 function REPORT_CALL(days, ok, err) { apiPost({ action: 'report', days: days, pin: pin }, ok, err); }
 function TOUR_CALL(p, ok, err) { p.action = 'tour'; apiPost(p, ok, err); }
 function GTASK_CALL(p, ok, err) { p.action = 'gtask'; p.pin = pin; apiPost(p, ok, err); }
-function ORDER_CALL(part, photo, ok, err) { apiPost({ action: 'orderpart', part: part, user: user, pin: pin, photo: photo || '', photoType: 'image/jpeg' }, ok, err); }
+function ORDER_CALL(o, ok, err) { apiPost({ action: 'orderpart', part: o.part, qty: o.qty, priority: o.priority, brand: o.brand, notes: o.notes, user: user, pin: pin, photo: o.photo || '', photoType: 'image/jpeg' }, ok, err); }
 function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, user: user, pin: pin }, ok, err); }
 function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
@@ -1391,11 +1399,17 @@ function orderPhotoPicked(input) {
   };
   rd.readAsDataURL(f);
 }
+var orderPrio = 'Routine';
 function renderOrder_() {
   orderPick = '';
   orderPhoto = '';
+  orderPrio = 'Routine';
   document.getElementById('o-photo-note').textContent = '';
   document.getElementById('o-text').value = '';
+  document.getElementById('o-qty').value = '1';
+  document.getElementById('o-brand').value = '';
+  document.getElementById('o-notes').value = '';
+  chipRow('o-prio', ['Urgent', 'Soon', 'Routine'], 'Routine', function(v){ orderPrio = v; });
   chipRow('o-chips', (DB.parts && DB.parts.length ? DB.parts : []), '', function(v){ orderPick = v; });
   var el = document.getElementById('o-list');
   var open = DB.partsNeeded || [];
@@ -1404,22 +1418,30 @@ function renderOrder_() {
   open.forEach(function(p){
     var age = openDays_(p.when).replace('open ', 'waiting ').replace('logged today', 'added today');
     var tag = p.assetId === 'Stock' ? 'stock order' : 'for ' + p.assetId;
+    var prioBadge = p.priority === 'Urgent' ? ' <span class="pill oos" style="font-size:10px;padding:2px 8px">Urgent</span>'
+      : p.priority === 'Soon' ? ' <span class="pill wait" style="font-size:10px;padding:2px 8px">Soon</span>' : '';
     h += '<div class="move" style="cursor:pointer" onclick="doneOrder(' + p.row + ',\'' + String(p.part).replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\')">' +
-         '<b>' + p.part + '</b><div class="meta">' + [tag, p.by, age].filter(Boolean).join(' \u00b7 ') +
-         (p.photo ? ' \u00b7 <a href="' + p.photo + '" target="_blank" onclick="event.stopPropagation()">\ud83d\udcf7 photo</a>' : '') + '</div></div>';
+         '<b>' + p.part + (p.qty ? ' \u00d7' + p.qty : '') + '</b>' + prioBadge +
+         '<div class="meta">' + [p.brand, tag, p.by, age].filter(Boolean).join(' \u00b7 ') +
+         (p.photo ? ' \u00b7 <a href="' + p.photo + '" target="_blank" onclick="event.stopPropagation()">\ud83d\udcf7 photo</a>' : '') + '</div>' +
+         (p.notes ? '<div class="meta">' + p.notes + '</div>' : '') + '</div>';
   });
   el.innerHTML = h;
 }
 function addOrder() {
   var txt = document.getElementById('o-text').value.trim();
-  var part = [orderPick, txt].filter(Boolean).join(' \u2014 ');
+  var part = txt || orderPick;
   if (!part) { toast('Pick a part or type one first', true); return; }
+  var qty = document.getElementById('o-qty').value.trim() || '1';
+  var brand = document.getElementById('o-brand').value.trim();
+  var notes = document.getElementById('o-notes').value.trim();
   document.getElementById('o-add').disabled = true;
-  ORDER_CALL(part, orderPhoto, function(r){
+  ORDER_CALL({ part: part, qty: qty, priority: orderPrio, brand: brand, notes: notes, photo: orderPhoto }, function(r){
     document.getElementById('o-add').disabled = false;
     if (r.denied) { toast('Workshop PIN needed \u2014 unlock on the home screen', true); return; }
     if (r.error) { toast(r.error, true); return; }
-    (DB.partsNeeded = DB.partsNeeded || []).unshift({ row: -1, assetId: 'Stock', part: part, by: user, when: new Date().toISOString(), photo: r.photo || '' });
+    (DB.partsNeeded = DB.partsNeeded || []).unshift({ row: -1, assetId: 'Stock', part: part, qty: qty,
+      priority: orderPrio, brand: brand, notes: notes, by: user, when: new Date().toISOString(), photo: r.photo || '' });
     orderPhoto = '';
     document.getElementById('o-photo-note').textContent = '';
     try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
