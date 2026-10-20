@@ -116,6 +116,8 @@
   .move { padding:9px 2px; border-bottom:1px solid var(--line); font-size:13px; }
   .move b { font-family:'Montserrat',sans-serif; }
   .move .meta { color:var(--grey); font-size:12px; }
+  label.chk { display:flex; gap:12px; align-items:flex-start; padding:12px 2px; border-bottom:1px solid var(--line); font-size:15px; cursor:pointer; }
+  label.chk input { width:22px; height:22px; accent-color:var(--red); flex-shrink:0; margin-top:-1px; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -381,6 +383,16 @@
     <div id="t-out"></div>
   </section>
 
+
+  <!-- PRE-TOUR CHECKLIST -->
+  <section id="view-check" class="hidden">
+    <button class="back" onclick="go('tour')">&#8249; Back</button>
+    <h2>Pre-tour checklist</h2>
+    <p class="note" id="c-note"></p>
+    <div id="c-list"></div>
+    <button class="primary" style="width:100%;margin-top:14px" id="c-save" onclick="saveChecklist()" disabled>Tick everything to continue</button>
+  </section>
+
   <!-- LOOKUP: bike card -->
   <section id="view-bike" class="hidden">
     <button class="back" onclick="go(bikeFrom)" id="b-back">‹ Back</button>
@@ -411,7 +423,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbyfCKvYyToOQbDe1ulKxU2B3lzPbDptS-j1ncy1RNd04GXhaBhbnidoawePAsDxE4BJ/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzpqLp9NsekMvY7sVCkrTE02hknjyqgrTZIVUWMQM4kA0ZWIcm_N0mviaW_2VP1hd77/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -423,7 +435,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B21';
+var UI_VERSION = 'B22';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -523,7 +535,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -601,6 +613,10 @@ function go(view) {
     toast('Pick the tour site first', true);
     renderTourHub();
     show('view-tour');
+    return;
+  } else if (view === 'tour-out' && !checklistOK_()) {
+    renderChecklist_();
+    show('view-check');
     return;
   } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in') {
     mode = view;
@@ -1329,6 +1345,7 @@ function PERSON_CALL(name, code, ok, err) { apiPost({ action: 'person', name: na
 function FAULT_CALL(p, ok, err) { p.action = 'fault'; apiPost(p, ok, err); }
 function REPORT_CALL(days, ok, err) { apiPost({ action: 'report', days: days, pin: pin }, ok, err); }
 function TOUR_CALL(p, ok, err) { p.action = 'tour'; apiPost(p, ok, err); }
+function CHECK_CALL(p, ok, err) { p.action = 'checklist'; apiPost(p, ok, err); }
 function GTASK_CALL(p, ok, err) { p.action = 'gtask'; p.pin = pin; apiPost(p, ok, err); }
 function ORDER_CALL(o, ok, err) { apiPost({ action: 'orderpart', part: o.part, qty: o.qty, priority: o.priority, brand: o.brand, notes: o.notes, user: user, pin: pin, photo: o.photo || '', photoType: 'image/jpeg' }, ok, err); }
 function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, user: user, pin: pin }, ok, err); }
@@ -1353,6 +1370,51 @@ function renderTourLoc_() {
     el.appendChild(b);
   });
 }
+/* ---- Pre-tour checklist (B22) ---- */
+var CHECKLIST_DEFAULT = ['Area cleaned','Welcome sign out','Enough bikes out + a few extras',
+  'Bikes cleaned and checked','Bikes set to correct gear','Bike chains lubed','Tyre pressure checked',
+  'Bikes racked in height order','Helmets checked and laid out','Water and snacks ready',
+  'Full kit check \u2014 multi tool, first aid kit, tubes','Inside of shed cleaned',
+  'Guides dressed in appropriate gear + ready for guests','No personal items of guides lying around',
+  'Tour-specific items taken (sized tubes, 10\u2033 spanner for e-bike)',
+  'Pack-up done and locked prior to departure'];
+
+function chkStamp_() { return new Date().toDateString() + '|' + user + '|' + tourLoc; }
+function checklistOK_() {
+  try { return localStorage.getItem('cab_checklist') === chkStamp_(); } catch(e) { return false; }
+}
+function chkItems_() {
+  return (DB.checklist && DB.checklist.length) ? DB.checklist : CHECKLIST_DEFAULT;
+}
+function renderChecklist_() {
+  document.getElementById('c-note').innerHTML =
+    'Set-up at <b>' + tourLoc + '</b>. Tick each item as it\u2019s done \u2014 all of them before you can scan bikes out. Logged under <b>' + user + '</b>.';
+  document.getElementById('c-list').innerHTML = chkItems_().map(function(it){
+    return '<label class="chk"><input type="checkbox" onchange="chkChanged_()"><span>' + it + '</span></label>';
+  }).join('');
+  chkChanged_();
+}
+function chkChanged_() {
+  var boxes = document.querySelectorAll('#c-list input');
+  var left = 0;
+  boxes.forEach(function(b){ if (!b.checked) left++; });
+  var btn = document.getElementById('c-save');
+  btn.disabled = left > 0;
+  btn.textContent = left > 0 ? (left + ' item' + (left === 1 ? '' : 's') + ' left to tick') : 'All done \u2014 start scanning bikes out';
+}
+function saveChecklist() {
+  var btn = document.getElementById('c-save');
+  btn.disabled = true; btn.textContent = 'Saving\u2026';
+  var items = [];
+  document.querySelectorAll('#c-list label.chk span').forEach(function(s){ items.push(s.textContent); });
+  CHECK_CALL({ site: tourLoc, user: user, items: items }, function(r){
+    if (r && r.error) { toast(r.error, true); chkChanged_(); return; }
+    try { localStorage.setItem('cab_checklist', chkStamp_()); } catch(e) {}
+    toast('Checklist logged \u2014 ' + items.length + ' items');
+    go('tour-out');
+  }, function(){ toast('Save failed \u2014 check signal and try again', true); chkChanged_(); });
+}
+
 function renderTourHub(fresh) {
   renderTourLoc_();
   var el = document.getElementById('t-out');
