@@ -118,6 +118,9 @@
   .move .meta { color:var(--grey); font-size:12px; }
   label.chk { display:flex; gap:12px; align-items:flex-start; padding:12px 2px; border-bottom:1px solid var(--line); font-size:15px; cursor:pointer; }
   label.chk input { width:22px; height:22px; accent-color:var(--red); flex-shrink:0; margin-top:-1px; }
+  #m-results .mres { display:flex; justify-content:space-between; gap:10px; align-items:center;
+    padding:10px 4px; border-bottom:1px solid var(--line); font-size:14px; cursor:pointer; }
+  #m-results .mres .mr-meta { font-size:12px; color:var(--grey); text-align:right; flex-shrink:0; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -210,9 +213,10 @@
     <p class="note" id="scan-hint">Point the camera at the barcode. If it won't read, snap a photo or type the number.</p>
     <div class="manual">
       <input type="text" id="manual" inputmode="text" autocomplete="off"
-             placeholder="Or type the number under the barcode">
+             placeholder="Or type bike name or barcode &mdash; e.g. BNW 5" oninput="manualSearch_()">
       <button class="primary" onclick="manualGo()">Go</button>
     </div>
+    <div id="m-results"></div>
     <button class="quiet" id="gtask-btn" style="width:100%;margin-top:14px;display:none" onclick="go('gtask')">
       No bike involved? Log a general task
     </button>
@@ -423,7 +427,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzpqLp9NsekMvY7sVCkrTE02hknjyqgrTZIVUWMQM4kA0ZWIcm_N0mviaW_2VP1hd77/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzEcwpHWrSvip0l9Vdd0HuZ7iF3eC_PN9o4bdrxNlAT1nM-idsAe1oPNmT-Y_8wWEO_/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -435,7 +439,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B22';
+var UI_VERSION = 'B23';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -626,6 +630,7 @@ function go(view) {
       : view === 'tour-out' ? 'Scan each bike going on tour \u2014 ' + tourLoc
       : view === 'tour-in' ? 'Scan each bike coming back to ' + tourLoc : 'Scan a bike';
     document.getElementById('manual').value = '';
+    var mr = document.getElementById('m-results'); if (mr) mr.innerHTML = '';
     var sb = document.getElementById('snapbtn');
     sb.className = 'quiet'; sb.style.marginTop = '10px';
     sb.innerHTML = '&#128247; Snap the barcode (backup &mdash; testing)';
@@ -698,6 +703,33 @@ function snapDecode(input) {
 function stopScanner() {
   if (scanner) { try { scanner.stop().then(function(){ scanner.clear(); }); } catch(e){} scanner = null; }
 }
+/* ---- Find a bike by name (B23) ---- */
+function normCode_(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '').replace(/(^|[a-z])0+(\d)/g, '$1$2');
+}
+function manualSearch_() {
+  var box = document.getElementById('m-results');
+  if (mode === 'assign') { box.innerHTML = ''; return; }   // assign = typing a NEW sticker number
+  var q = document.getElementById('manual').value.trim();
+  var nq = normCode_(q);
+  if (q.length < 2 || !nq) { box.innerHTML = ''; return; }
+  var hits = (DB.bikes || []).filter(function(b){
+    return normCode_(b.assetId).indexOf(nq) !== -1 || String(b.barcode || '').indexOf(q) === 0;
+  }).slice(0, 8);
+  box.innerHTML = hits.map(function(b){
+    var code = b.barcode || b.assetId;
+    return '<div class="mres" onclick="pickManual_(\'' + String(code).replace(/'/g, "\\'") + '\')">' +
+      '<span><b>' + b.assetId + '</b>' + (b.barcode ? '' : ' <span style="color:var(--red)">no tag</span>') + '</span>' +
+      '<span class="mr-meta">' + (STATUS_LABELS[b.status] || b.status || '') +
+      (b.location ? ' &middot; ' + b.location : '') + '</span></div>';
+  }).join('');
+}
+function pickManual_(code) {
+  document.getElementById('m-results').innerHTML = '';
+  document.getElementById('manual').value = '';
+  onCode(code);
+}
+
 function manualGo() {
   var v = document.getElementById('manual').value.trim();
   if (v) onCode(v);
