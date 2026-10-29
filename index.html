@@ -121,6 +121,8 @@
   #m-results .mres { display:flex; justify-content:space-between; gap:10px; align-items:center;
     padding:10px 4px; border-bottom:1px solid var(--line); font-size:14px; cursor:pointer; }
   #m-results .mres .mr-meta { font-size:12px; color:var(--grey); text-align:right; flex-shrink:0; }
+  .ti-guide { font-family:'Montserrat',sans-serif; font-weight:800; font-size:13px; margin-top:14px; padding-bottom:4px; display:flex; justify-content:space-between; align-items:center; }
+  .ti-guide a { color:var(--red); font-weight:700; font-size:12px; cursor:pointer; text-decoration:underline; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -365,6 +367,7 @@
     <h2>Waiting to arrive</h2>
     <p class="note">Emailed daily until marked received. Tap an item when it arrives.</p>
     <div id="o-list"></div>
+    <button class="primary" style="width:100%;margin-top:12px;display:none" id="o-done" onclick="batchPartsDone_()" disabled>Tick parts as they arrive</button>
   </section>
 
   <!-- TOUR HUB -->
@@ -397,6 +400,17 @@
     <button class="primary" style="width:100%;margin-top:14px" id="c-save" onclick="saveChecklist()" disabled>Tick everything to continue</button>
   </section>
 
+
+  <!-- TOUR RETURN: tick-box check-in -->
+  <section id="view-tourin" class="hidden">
+    <button class="back" onclick="go('tour')">&#8249; Back</button>
+    <h2>Which bikes are back?</h2>
+    <p class="note" id="ti-note"></p>
+    <div id="ti-list"></div>
+    <button class="primary" style="width:100%;margin-top:14px" id="ti-save" onclick="saveTourIn_()" disabled>Tick the bikes that are back</button>
+    <button class="quiet" style="width:100%;margin-top:10px" onclick="go('tour-in-scan')">&#128247; Scan them in instead</button>
+  </section>
+
   <!-- LOOKUP: bike card -->
   <section id="view-bike" class="hidden">
     <button class="back" onclick="go(bikeFrom)" id="b-back">‹ Back</button>
@@ -427,7 +441,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzEcwpHWrSvip0l9Vdd0HuZ7iF3eC_PN9o4bdrxNlAT1nM-idsAe1oPNmT-Y_8wWEO_/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwVOzJLineB5laOp18sOT8jq2vxHIC8ICm5J0EapGNLsnx5S5NTkDe_bXOHXiTBdxfd/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -439,7 +453,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B23';
+var UI_VERSION = 'B25';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -539,7 +553,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -613,7 +627,7 @@ function go(view) {
     tourSession = [];
     renderTourHub();
     show('view-tour');
-  } else if ((view === 'tour-out' || view === 'tour-in') && !tourLoc) {
+  } else if ((view === 'tour-out' || view === 'tour-in' || view === 'tour-in-scan') && !tourLoc) {
     toast('Pick the tour site first', true);
     renderTourHub();
     show('view-tour');
@@ -622,13 +636,16 @@ function go(view) {
     renderChecklist_();
     show('view-check');
     return;
-  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in') {
-    mode = view;
+  } else if (view === 'tour-in') {
+    renderTourIn_();
+    show('view-tourin');
+  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in-scan') {
+    mode = (view === 'tour-in-scan') ? 'tour-in' : view;
     document.getElementById('scan-title').textContent =
       view === 'assign' ? 'Scan the sticker on the bike'
       : view === 'workshop' ? 'Scan the bike you worked on'
       : view === 'tour-out' ? 'Scan each bike going on tour \u2014 ' + tourLoc
-      : view === 'tour-in' ? 'Scan each bike coming back to ' + tourLoc : 'Scan a bike';
+      : view === 'tour-in-scan' ? 'Scan each bike coming back to ' + tourLoc : 'Scan a bike';
     document.getElementById('manual').value = '';
     var mr = document.getElementById('m-results'); if (mr) mr.innerHTML = '';
     var sb = document.getElementById('snapbtn');
@@ -730,6 +747,66 @@ function pickManual_(code) {
   onCode(code);
 }
 
+function goTour_() { go(mode === 'tour-in' ? 'tour-in-scan' : mode); }
+/* ---- Tick-box tour return (B24) ---- */
+function renderTourIn_() {
+  document.getElementById('ti-note').innerHTML =
+    'Everything ticked comes back in at <b>' + tourLoc + '</b>. Anything left unticked stays on tour \u2014 and stays on the 6pm chase list.';
+  var el = document.getElementById('ti-list');
+  var list = DB.onTour || [];
+  if (!list.length) {
+    el.innerHTML = '<p class="note">Nothing is out on tour right now.</p>';
+    tourInChanged_();
+    return;
+  }
+  var byGuide = {};
+  list.forEach(function(t){ (byGuide[t.guide || '?'] = byGuide[t.guide || '?'] || []).push(t); });
+  var h = '';
+  Object.keys(byGuide).sort().forEach(function(g, gi){
+    var items = byGuide[g];
+    h += '<div class="ti-guide"><span>' + g + ' \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') +
+         '</span><a onclick="tickGuide_(' + gi + ')">tick all</a></div>';
+    items.forEach(function(t){
+      var d = new Date(t.when), since = '';
+      if (!isNaN(d)) since = ' \u00b7 out since ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
+      h += '<label class="chk"><input type="checkbox" data-aid="' + t.assetId + '" data-g="' + gi + '" onchange="tourInChanged_()">' +
+           '<span><b>' + t.assetId + '</b> <span style="color:var(--grey);font-size:12px">' +
+           (t.location || '') + since + '</span></span></label>';
+    });
+  });
+  el.innerHTML = h;
+  tourInChanged_();
+}
+function tickGuide_(gi) {
+  document.querySelectorAll('#ti-list input[data-g="' + gi + '"]').forEach(function(b){ b.checked = true; });
+  tourInChanged_();
+}
+function tourInChanged_() {
+  var n = 0;
+  document.querySelectorAll('#ti-list input').forEach(function(b){ if (b.checked) n++; });
+  var btn = document.getElementById('ti-save');
+  btn.disabled = n === 0;
+  btn.textContent = n === 0 ? 'Tick the bikes that are back'
+    : 'Check in ' + n + ' bike' + (n === 1 ? '' : 's') + ' at ' + tourLoc;
+}
+function saveTourIn_() {
+  var assets = [];
+  document.querySelectorAll('#ti-list input').forEach(function(b){ if (b.checked) assets.push(b.getAttribute('data-aid')); });
+  if (!assets.length) return;
+  var btn = document.getElementById('ti-save');
+  btn.disabled = true; btn.textContent = 'Checking in\u2026';
+  TOURRET_CALL({ assets: assets, user: user, location: tourLoc }, function(r){
+    if (!r || r.error) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); tourInChanged_(); return; }
+    DB.onTour = (DB.onTour || []).filter(function(t){ return assets.indexOf(t.assetId) === -1; });
+    (DB.bikes || []).forEach(function(b){
+      if (assets.indexOf(b.assetId) !== -1) { b.status = 'Available'; b.location = tourLoc; }
+    });
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast(r.count + ' bike' + (r.count === 1 ? '' : 's') + ' back in at ' + tourLoc);
+    go('tour');
+  }, function(){ toast('Save failed \u2014 check signal', true); tourInChanged_(); });
+}
+
 function manualGo() {
   var v = document.getElementById('manual').value.trim();
   if (v) onCode(v);
@@ -749,9 +826,9 @@ function onCode(code) {
       if (!r || r.error || !r.assetId && !r.notFound && !r.blocked) {
         toast('Server is running old code \u2014 redeploy Code.gs (New version)', true); go('home'); return;
       }
-      if (r.notFound) { toast('No bike carries ' + code + ' \u2014 assign it first', true); go(mode); return; }
-      if (r.blocked) { toast(r.assetId + ' is ' + r.status + ' \u2014 not tour-ready', true); go(mode); return; }
-      if (r.already) { toast(r.assetId + ' is already out', true); go(mode); return; }
+      if (r.notFound) { toast('No bike carries ' + code + ' \u2014 assign it first', true); goTour_(); return; }
+      if (r.blocked) { toast(r.assetId + ' is ' + r.status + ' \u2014 not tour-ready', true); goTour_(); return; }
+      if (r.already) { toast(r.assetId + ' is already out', true); goTour_(); return; }
       DB.onTour = (DB.onTour || []).filter(function(t){ return t.assetId !== r.assetId; });
       if (dir === 'out') DB.onTour.push({ assetId: r.assetId, guide: user, when: new Date().toISOString(), location: tourLoc });
       (DB.bikes || []).some(function(b){
@@ -764,8 +841,8 @@ function onCode(code) {
       try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
       tourSession.push(r.assetId);
       toast(r.assetId + (dir === 'out' ? ' \u2014 out at ' + tourLoc + ' (' + tourSession.length + ')' : ' \u2014 back in at ' + tourLoc));
-      go(mode);            // straight back to the scanner \u2014 next bike
-    }, function(){ toast('Save failed \u2014 check signal', true); go(mode); });
+      goTour_();            // straight back to the scanner \u2014 next bike
+    }, function(){ toast('Save failed \u2014 check signal', true); goTour_(); });
   } else if (mode === 'workshop') {
     var onFound = function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet — assign it first', true); go('workshop'); return; }
@@ -1378,9 +1455,11 @@ function FAULT_CALL(p, ok, err) { p.action = 'fault'; apiPost(p, ok, err); }
 function REPORT_CALL(days, ok, err) { apiPost({ action: 'report', days: days, pin: pin }, ok, err); }
 function TOUR_CALL(p, ok, err) { p.action = 'tour'; apiPost(p, ok, err); }
 function CHECK_CALL(p, ok, err) { p.action = 'checklist'; apiPost(p, ok, err); }
+function TOURRET_CALL(p, ok, err) { p.action = 'tourreturn'; apiPost(p, ok, err); }
 function GTASK_CALL(p, ok, err) { p.action = 'gtask'; p.pin = pin; apiPost(p, ok, err); }
 function ORDER_CALL(o, ok, err) { apiPost({ action: 'orderpart', part: o.part, qty: o.qty, priority: o.priority, brand: o.brand, notes: o.notes, user: user, pin: pin, photo: o.photo || '', photoType: 'image/jpeg' }, ok, err); }
 function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, user: user, pin: pin }, ok, err); }
+function PARTSDONE_CALL(rows, ok, err) { apiPost({ action: 'partsdone', rows: rows, user: user, pin: pin }, ok, err); }
 function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
 
@@ -1513,7 +1592,7 @@ function renderOrder_() {
   chipRow('o-chips', (DB.parts && DB.parts.length ? DB.parts : []), '', function(v){ orderPick = v; });
   var el = document.getElementById('o-list');
   var open = DB.partsNeeded || [];
-  if (!open.length) { el.innerHTML = '<p class="note">Nothing outstanding.</p>'; return; }
+  if (!open.length) { el.innerHTML = '<p class="note">Nothing outstanding.</p>'; var ob = document.getElementById('o-done'); if (ob) ob.style.display = 'none'; return; }
   var rank = { 'Urgent': 0, 'Soon': 1 };
   open = open.slice().sort(function(a, b){
     var ra = (a.priority in rank) ? rank[a.priority] : 2;
@@ -1521,12 +1600,16 @@ function renderOrder_() {
     return ra - rb;
   });
   var h = '<div style="overflow-x:auto"><table class="parts">' +
-          '<tr><th>Part</th><th>Qty</th><th>Priority</th><th>Brand</th><th>Notes</th></tr>';
+          '<tr><th></th><th>Part</th><th>Qty</th><th>Priority</th><th>Brand</th><th>Notes</th></tr>';
   open.forEach(function(p){
     var age = openDays_(p.when).replace('open ', '').replace('logged today', 'today');
     var tag = p.assetId === 'Stock' ? '' : 'for ' + p.assetId + ' \u00b7 ';
     var pc = p.priority === 'Urgent' ? ' class="prio-u"' : p.priority === 'Soon' ? ' class="prio-s"' : '';
-    h += '<tr onclick="doneOrder(' + p.row + ',\'' + String(p.part).replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\')">' +
+    var tick = (p.row >= 2)
+      ? '<input type="checkbox" class="o-tick" data-row="' + p.row + '" onclick="event.stopPropagation()" onchange="orderTickChanged_()">'
+      : '';
+    h += '<tr onclick="toggleOrderRow_(' + p.row + ')">' +
+         '<td style="text-align:center">' + tick + '</td>' +
          '<td><b>' + p.part + '</b>' +
          (p.photo ? ' <a href="' + p.photo + '" target="_blank" onclick="event.stopPropagation()">\ud83d\udcf7</a>' : '') +
          '<div class="meta">' + tag + [p.by, age].filter(Boolean).join(' \u00b7 ') + '</div></td>' +
@@ -1537,6 +1620,7 @@ function renderOrder_() {
   });
   h += '</table></div>';
   el.innerHTML = h;
+  orderTickChanged_();
 }
 function addOrder() {
   var txt = document.getElementById('o-text').value.trim();
@@ -1560,6 +1644,39 @@ function addOrder() {
     renderOrder_();
   }, function(){ document.getElementById('o-add').disabled = false; toast('Save failed \u2014 check signal', true); });
 }
+/* ---- Batch parts-received (B25) ---- */
+function toggleOrderRow_(row) {
+  var b = document.querySelector('#o-list input[data-row="' + row + '"]');
+  if (!b) { toast('Just added \u2014 give it a second, then refresh', true); return; }
+  b.checked = !b.checked;
+  orderTickChanged_();
+}
+function orderTickChanged_() {
+  var n = 0;
+  document.querySelectorAll('#o-list input.o-tick').forEach(function(b){ if (b.checked) n++; });
+  var btn = document.getElementById('o-done');
+  if (!btn) return;
+  btn.style.display = '';
+  btn.disabled = n === 0;
+  btn.textContent = n === 0 ? 'Tick parts as they arrive' : 'Mark ' + n + ' part' + (n === 1 ? '' : 's') + ' received';
+}
+function batchPartsDone_() {
+  var rows = [];
+  document.querySelectorAll('#o-list input.o-tick').forEach(function(b){ if (b.checked) rows.push(Number(b.getAttribute('data-row'))); });
+  if (!rows.length) return;
+  if (!confirm('Mark ' + rows.length + ' part' + (rows.length === 1 ? '' : 's') + ' as received / no longer needed?')) return;
+  var btn = document.getElementById('o-done');
+  btn.disabled = true; btn.textContent = 'Saving\u2026';
+  PARTSDONE_CALL(rows, function(r){
+    if (!r || r.denied) { toast('Workshop PIN needed', true); orderTickChanged_(); return; }
+    if (r.error) { toast(r.error, true); orderTickChanged_(); return; }
+    DB.partsNeeded = (DB.partsNeeded || []).filter(function(p){ return rows.indexOf(p.row) === -1; });
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast(r.count + ' part' + (r.count === 1 ? '' : 's') + ' marked received');
+    renderOrder_();
+  }, function(){ toast('Save failed \u2014 check signal', true); orderTickChanged_(); });
+}
+
 function doneOrder(row, label) {
   if (row < 2) { toast('Just added \u2014 give it a second, then refresh', true); return; }
   if (!confirm('Mark "' + label + '" as received / no longer needed?')) return;
