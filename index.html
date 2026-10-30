@@ -160,6 +160,10 @@
         <div class="big">Guide</div>
         <div class="sub">Look up &amp; move bikes, take bikes on tour</div>
       </button>
+      <button class="tile" onclick="chooseSide('workshop')">
+        <div class="big">Workshop</div>
+        <div class="sub">Job queue, log work, order parts, task list</div>
+      </button>
       <button class="tile" onclick="chooseSide('office')">
         <div class="big">Office / Admin</div>
         <div class="sub">Dashboard, workshop, reports, barcodes</div>
@@ -178,6 +182,10 @@
         <div class="big">Tour bikes</div>
         <div class="sub">Scan bikes out for your tour &mdash; and back in after</div>
       </button>
+      <button class="tile" onclick="requireRole('workshop','wq')" id="tile-wq">
+        <div class="big">Bikes needing attention <span class="lock">&#128274;</span></div>
+        <div class="sub">The work queue &mdash; what to pick up next</div>
+      </button>
       <button class="tile" onclick="requireRole('workshop','workshop')" id="tile-workshop">
         <div class="big">Log workshop work <span class="lock">&#128274;</span></div>
         <div class="sub">Scan the bike, record what you did and what you used</div>
@@ -185,6 +193,10 @@
       <button class="tile" onclick="requireRole('workshop','order')" id="tile-order">
         <div class="big">Order parts <span class="lock">&#128274;</span></div>
         <div class="sub">Parts the workshop needs — emailed daily until received</div>
+      </button>
+      <button class="tile" onclick="requireRole('workshop','wtasks')" id="tile-wtasks">
+        <div class="big">Tasks to complete <span class="lock">&#128274;</span></div>
+        <div class="sub">Written jobs for the workshop &mdash; tick off when done</div>
       </button>
       <button class="tile" onclick="requireRole('admin','dash')" id="tile-dash">
         <div class="big">Location dashboard <span class="lock">&#128274;</span></div>
@@ -370,6 +382,28 @@
     <button class="primary" style="width:100%;margin-top:12px;display:none" id="o-done" onclick="batchPartsDone_()" disabled>Tick parts as they arrive</button>
   </section>
 
+
+  <!-- WORKSHOP: work queue -->
+  <section id="view-wq" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Bikes needing attention</h2>
+    <p class="note">What to pick up next. Tap a bike to open its job card.</p>
+    <div id="wq-list"></div>
+  </section>
+
+  <!-- WORKSHOP: written task list -->
+  <section id="view-wtasks" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Tasks to complete</h2>
+    <p class="note">Written jobs for the workshop &mdash; tick them off as they&rsquo;re done. Outstanding tasks go on the daily 5pm email.</p>
+    <div class="manual" style="margin-top:6px">
+      <input type="text" id="wt-text" autocomplete="off" placeholder="Write a task &mdash; e.g. E-Bike 43 parts arrived, collect &amp; fit">
+      <button class="primary" onclick="wtaskAdd_()">Add</button>
+    </div>
+    <div id="wt-list"></div>
+    <button class="primary" style="width:100%;margin-top:12px" id="wt-done" onclick="saveWtasks_()" disabled>Tick tasks as you finish them</button>
+  </section>
+
   <!-- TOUR HUB -->
   <section id="view-tour" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
@@ -441,7 +475,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwVOzJLineB5laOp18sOT8jq2vxHIC8ICm5J0EapGNLsnx5S5NTkDe_bXOHXiTBdxfd/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzkTk33iIlttynx0gT8yC40n4jHZwb85vpxbMEHU01TCSjz8yiDTlIEb_ncZSHYf4qC/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -453,7 +487,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B25';
+var UI_VERSION = 'B26';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -465,11 +499,14 @@ function chooseSide(s) {
 }
 function paintSide_() {
   var showOffice = side === 'office';
+  var showWs = side === 'workshop';
   var vis = {
     'tile-lookup': true,
-    'tile-tour': side !== 'office',
-    'tile-workshop': showOffice,
-    'tile-order': showOffice,
+    'tile-tour': !showOffice && !showWs,
+    'tile-wq': showOffice || showWs,
+    'tile-workshop': showOffice || showWs,
+    'tile-order': showOffice || showWs,
+    'tile-wtasks': showOffice || showWs,
     'tile-dash': showOffice,
     'tile-report': showOffice,
     'tile-assign': showOffice
@@ -501,12 +538,16 @@ function paintRoles_() {
   if (w) w.className = 'tile' + (roleRank_(role) >= 1 ? ' open' : '');
   var od = document.getElementById('tile-order');
   if (od) od.className = 'tile' + (roleRank_(role) >= 1 ? ' open' : '');
+  ['tile-wq', 'tile-wtasks'].forEach(function(id){
+    var t = document.getElementById(id);
+    if (t) t.className = 'tile' + (roleRank_(role) >= 1 ? ' open' : '');
+  });
   if (d) d.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
   if (a) a.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
   var n = document.getElementById('role-note');
   if (n) {
     var base = side === 'guide' ? 'Guide'
-      : role === 'guide' ? 'Office &middot; locked tiles need a PIN'
+      : role === 'guide' ? (side === 'workshop' ? 'Workshop' : 'Office') + ' &middot; locked tiles need a PIN'
       : role === 'workshop' ? 'Workshop access &middot; <a href="#" onclick="lockDown();return false">lock</a>'
       : 'Management access &middot; <a href="#" onclick="lockDown();return false">lock</a>';
     var sv = DB.version || '?';
@@ -553,7 +594,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -623,6 +664,12 @@ function go(view) {
   } else if (view === 'gtask') {
     openGtask_();
     show('view-gtask');
+  } else if (view === 'wq') {
+    renderWq_();
+    show('view-wq');
+  } else if (view === 'wtasks') {
+    renderWtasks_();
+    show('view-wtasks');
   } else if (view === 'tour') {
     tourSession = [];
     renderTourHub();
@@ -745,6 +792,118 @@ function pickManual_(code) {
   document.getElementById('m-results').innerHTML = '';
   document.getElementById('manual').value = '';
   onCode(code);
+}
+
+/* ---- Workshop side (B26): work queue + written task list ---- */
+function renderWq_() {
+  var el = document.getElementById('wq-list');
+  var bikes = (DB.bikes || []).filter(function(b){ return b.active !== 'No'; });
+  var openParts = {};
+  (DB.partsNeeded || []).forEach(function(p){
+    if (p.assetId && p.assetId !== 'Stock') (openParts[p.assetId] = openParts[p.assetId] || []).push(p);
+  });
+  var ready = [], waiting = [], bench = [], pending = [];
+  bikes.forEach(function(b){
+    if (b.status === 'Waiting for parts') { (openParts[b.assetId] ? waiting : ready).push(b); }
+    else if (b.status === 'Workshop') bench.push(b);
+    else if (b.status === 'Pending') pending.push(b);
+  });
+  var listed = {};
+  ready.concat(waiting, bench, pending).forEach(function(b){ listed[b.assetId] = 1; });
+  var faultBikes = {};
+  (DB.faults || []).forEach(function(f){ if (!listed[f.assetId]) faultBikes[f.assetId] = 1; });
+  var h = '';
+  function days_(b){
+    var t = openDays_(b.statusChanged).replace('open ', '').replace('logged today', 'today');
+    return t ? ' \u00b7 ' + t : '';
+  }
+  function row_(b, extra){
+    var code = b.barcode || b.assetId;
+    return '<div class="move" onclick="wqOpen_(\'' + String(code).replace(/'/g, "\\'") + '\')" style="cursor:pointer"><b>' +
+      b.assetId + '</b> \u00b7 ' + (b.location || '?') + days_(b) + (extra || '') + faultLine_(b.assetId) + '</div>';
+  }
+  function section_(title, arr, color, extraFn){
+    if (!arr.length) return;
+    h += '<h2' + (color ? ' style="color:' + color + '"' : '') + '>' + title + ' (' + arr.length + ')</h2>';
+    arr.forEach(function(b){ h += row_(b, extraFn ? extraFn(b) : ''); });
+  }
+  section_('Ready to fix \u2014 no parts outstanding', ready, 'var(--red)');
+  section_('Waiting for parts', waiting, '', function(b){
+    return '<div class="meta">\ud83d\udd27 ' + openParts[b.assetId].map(function(p){ return p.part; }).join(' \u00b7 ') + '</div>';
+  });
+  section_('On the bench', bench);
+  section_('Pending check', pending);
+  var fk = Object.keys(faultBikes).sort();
+  if (fk.length) {
+    h += '<h2>Reported faults \u2014 not in workshop yet (' + fk.length + ')</h2>';
+    fk.forEach(function(aid){
+      var b = null;
+      bikes.some(function(x){ if (x.assetId === aid) { b = x; return true; } });
+      if (b) h += row_(b);
+    });
+  }
+  el.innerHTML = h || '<p class="note">Nothing needs attention \u2014 clean bench.</p>';
+}
+function wqOpen_(code) {
+  current.code = code;
+  LOOKUP_CALL(code, function(r){
+    if (r.notFound) { toast('Bike not found', true); return; }
+    openJob(r.bike, r.history, r.faults);
+  }, function(){ toast('Lookup failed \u2014 check signal', true); });
+}
+function renderWtasks_() {
+  var el = document.getElementById('wt-list');
+  var list = DB.wtasks || [];
+  if (!list.length) {
+    el.innerHTML = '<p class="note">No open tasks \u2014 the list is clear.</p>';
+  } else {
+    el.innerHTML = list.map(function(t){
+      var age = openDays_(t.when).replace('open ', '').replace('logged today', 'added today');
+      var tick = (t.row >= 2)
+        ? '<input type="checkbox" data-row="' + t.row + '" onchange="wtasksChanged_()">'
+        : '<input type="checkbox" disabled>';
+      return '<label class="chk">' + tick +
+        '<span>' + t.task + ' <span style="color:var(--grey);font-size:12px">' +
+        [t.by, age].filter(Boolean).join(' \u00b7 ') + '</span></span></label>';
+    }).join('');
+  }
+  wtasksChanged_();
+}
+function wtasksChanged_() {
+  var n = 0;
+  document.querySelectorAll('#wt-list input').forEach(function(b){ if (b.checked) n++; });
+  var btn = document.getElementById('wt-done');
+  btn.disabled = n === 0;
+  btn.textContent = n === 0 ? 'Tick tasks as you finish them' : 'Mark ' + n + ' task' + (n === 1 ? '' : 's') + ' done';
+}
+function wtaskAdd_() {
+  var inp = document.getElementById('wt-text');
+  var t = inp.value.trim();
+  if (!t) { toast('Type the task first', true); return; }
+  WTADD_CALL({ task: t, user: user }, function(r){
+    if (!r || r.denied) { toast('Workshop PIN needed', true); return; }
+    if (r.error) { toast(r.error, true); return; }
+    inp.value = '';
+    (DB.wtasks = DB.wtasks || []).push({ row: -1, task: t, by: user, when: new Date().toISOString() });
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast('Task added');
+    renderWtasks_();
+  }, function(){ toast('Save failed \u2014 check signal', true); });
+}
+function saveWtasks_() {
+  var rows = [];
+  document.querySelectorAll('#wt-list input').forEach(function(b){ if (b.checked) rows.push(Number(b.getAttribute('data-row'))); });
+  if (!rows.length) return;
+  var btn = document.getElementById('wt-done');
+  btn.disabled = true; btn.textContent = 'Saving\u2026';
+  WTDONE_CALL(rows, function(r){
+    if (!r || r.denied) { toast('Workshop PIN needed', true); wtasksChanged_(); return; }
+    if (r.error) { toast(r.error, true); wtasksChanged_(); return; }
+    DB.wtasks = (DB.wtasks || []).filter(function(t){ return rows.indexOf(t.row) === -1; });
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast(r.count + ' task' + (r.count === 1 ? '' : 's') + ' done');
+    renderWtasks_();
+  }, function(){ toast('Save failed \u2014 check signal', true); wtasksChanged_(); });
 }
 
 function goTour_() { go(mode === 'tour-in' ? 'tour-in-scan' : mode); }
@@ -1456,6 +1615,8 @@ function REPORT_CALL(days, ok, err) { apiPost({ action: 'report', days: days, pi
 function TOUR_CALL(p, ok, err) { p.action = 'tour'; apiPost(p, ok, err); }
 function CHECK_CALL(p, ok, err) { p.action = 'checklist'; apiPost(p, ok, err); }
 function TOURRET_CALL(p, ok, err) { p.action = 'tourreturn'; apiPost(p, ok, err); }
+function WTADD_CALL(p, ok, err) { p.action = 'wtaskadd'; p.pin = pin; apiPost(p, ok, err); }
+function WTDONE_CALL(rows, ok, err) { apiPost({ action: 'wtasksdone', rows: rows, user: user, pin: pin }, ok, err); }
 function GTASK_CALL(p, ok, err) { p.action = 'gtask'; p.pin = pin; apiPost(p, ok, err); }
 function ORDER_CALL(o, ok, err) { apiPost({ action: 'orderpart', part: o.part, qty: o.qty, priority: o.priority, brand: o.brand, notes: o.notes, user: user, pin: pin, photo: o.photo || '', photoType: 'image/jpeg' }, ok, err); }
 function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, user: user, pin: pin }, ok, err); }
