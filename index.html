@@ -118,11 +118,14 @@
   .move .meta { color:var(--grey); font-size:12px; }
   label.chk { display:flex; gap:12px; align-items:flex-start; padding:12px 2px; border-bottom:1px solid var(--line); font-size:15px; cursor:pointer; }
   label.chk input { width:22px; height:22px; accent-color:var(--red); flex-shrink:0; margin-top:-1px; }
-  #m-results .mres { display:flex; justify-content:space-between; gap:10px; align-items:center;
+  #m-results .mres, #wt-bres .mres { display:flex; justify-content:space-between; gap:10px; align-items:center;
     padding:10px 4px; border-bottom:1px solid var(--line); font-size:14px; cursor:pointer; }
-  #m-results .mres .mr-meta { font-size:12px; color:var(--grey); text-align:right; flex-shrink:0; }
+  #m-results .mres .mr-meta, #wt-bres .mres .mr-meta { font-size:12px; color:var(--grey); text-align:right; flex-shrink:0; }
   .ti-guide { font-family:'Montserrat',sans-serif; font-weight:800; font-size:13px; margin-top:14px; padding-bottom:4px; display:flex; justify-content:space-between; align-items:center; }
   .ti-guide a { color:var(--red); font-weight:700; font-size:12px; cursor:pointer; text-decoration:underline; }
+  .wqrow { display:flex; gap:10px; align-items:flex-start; }
+  .wqrow > input { width:22px; height:22px; accent-color:var(--red); flex-shrink:0; margin-top:2px; }
+  .wqrow > div { flex:1; min-width:0; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -387,8 +390,9 @@
   <section id="view-wq" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
     <h2>Bikes needing attention</h2>
-    <p class="note">What to pick up next. Tap a bike to open its job card.</p>
+    <p class="note">What to pick up next. Tap a bike to open its job card and log the work \u2014 or tick it when it&rsquo;s sorted and clear several at once.</p>
     <div id="wq-list"></div>
+    <button class="primary" style="width:100%;margin-top:12px;display:none" id="wq-done" onclick="saveWqFixed_()" disabled>Tick bikes when they&rsquo;re sorted</button>
   </section>
 
   <!-- WORKSHOP: written task list -->
@@ -396,10 +400,12 @@
     <button class="back" onclick="go('home')">&#8249; Back</button>
     <h2>Tasks to complete</h2>
     <p class="note">Written jobs for the workshop &mdash; tick them off as they&rsquo;re done. Outstanding tasks go on the daily 5pm email.</p>
-    <div class="manual" style="margin-top:6px">
-      <input type="text" id="wt-text" autocomplete="off" placeholder="Write a task &mdash; e.g. E-Bike 43 parts arrived, collect &amp; fit">
+    <input type="text" id="wt-text" autocomplete="off" placeholder="Write a task &mdash; e.g. parts arrived, collect from dealer &amp; fit" style="margin-top:6px">
+    <div class="manual" style="margin-top:8px">
+      <input type="text" id="wt-bike" autocomplete="off" placeholder="Bike (optional) &mdash; type name, e.g. E-Bike 43" oninput="wtBikeSearch_()">
       <button class="primary" onclick="wtaskAdd_()">Add</button>
     </div>
+    <div id="wt-bres"></div>
     <div id="wt-list"></div>
     <button class="primary" style="width:100%;margin-top:12px" id="wt-done" onclick="saveWtasks_()" disabled>Tick tasks as you finish them</button>
   </section>
@@ -475,7 +481,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzkTk33iIlttynx0gT8yC40n4jHZwb85vpxbMEHU01TCSjz8yiDTlIEb_ncZSHYf4qC/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzYhyghwhIpDAYwFjyLM5aq2Yo0ZYASBGd2odNEU-R53Wa0DG_A85bKAM6WAJCzlqnJ/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -487,7 +493,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B26';
+var UI_VERSION = 'B28';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -819,8 +825,10 @@ function renderWq_() {
   }
   function row_(b, extra){
     var code = b.barcode || b.assetId;
-    return '<div class="move" onclick="wqOpen_(\'' + String(code).replace(/'/g, "\\'") + '\')" style="cursor:pointer"><b>' +
-      b.assetId + '</b> \u00b7 ' + (b.location || '?') + days_(b) + (extra || '') + faultLine_(b.assetId) + '</div>';
+    return '<div class="move wqrow">' +
+      '<input type="checkbox" class="wq-tick" data-aid="' + String(b.assetId).replace(/"/g, '&quot;') + '" onchange="wqChanged_()">' +
+      '<div onclick="wqOpen_(\'' + String(code).replace(/'/g, "\\'") + '\')" style="cursor:pointer"><b>' +
+      b.assetId + '</b> \u00b7 ' + (b.location || '?') + days_(b) + (extra || '') + faultLine_(b.assetId) + '</div></div>';
   }
   function section_(title, arr, color, extraFn){
     if (!arr.length) return;
@@ -843,7 +851,45 @@ function renderWq_() {
     });
   }
   el.innerHTML = h || '<p class="note">Nothing needs attention \u2014 clean bench.</p>';
+  var qb = document.getElementById('wq-done');
+  if (qb) qb.style.display = h ? '' : 'none';
+  wqChanged_();
 }
+/* ---- Tick bikes as sorted (B28) ---- */
+function wqChanged_() {
+  var n = 0;
+  document.querySelectorAll('#wq-list input.wq-tick').forEach(function(b){ if (b.checked) n++; });
+  var btn = document.getElementById('wq-done');
+  if (!btn) return;
+  btn.disabled = n === 0;
+  btn.textContent = n === 0 ? 'Tick bikes when they\u2019re sorted'
+    : 'Mark ' + n + ' bike' + (n === 1 ? '' : 's') + ' Ready to ride';
+}
+function saveWqFixed_() {
+  var assets = [];
+  document.querySelectorAll('#wq-list input.wq-tick').forEach(function(b){ if (b.checked) assets.push(b.getAttribute('data-aid')); });
+  if (!assets.length) return;
+  if (!confirm('Mark ' + assets.length + ' bike' + (assets.length === 1 ? '' : 's') + ' as sorted? Status goes to Ready to ride and open faults are cleared \u2014 no job card is written.')) return;
+  var btn = document.getElementById('wq-done');
+  btn.disabled = true; btn.textContent = 'Saving\u2026';
+  FIXED_CALL(assets, function(r){
+    if (!r || r.denied) { toast('Workshop PIN needed', true); wqChanged_(); return; }
+    if (r.error) { toast(r.error, true); wqChanged_(); return; }
+    (DB.bikes || []).forEach(function(b){
+      if (assets.indexOf(b.assetId) !== -1 &&
+          (b.status === 'Workshop' || b.status === 'Waiting for parts' || b.status === 'Pending')) {
+        b.status = 'Available';
+        b.statusChanged = new Date().toISOString();
+      }
+    });
+    DB.faults = (DB.faults || []).filter(function(f){ return assets.indexOf(f.assetId) === -1; });
+    DB.partsNeeded = (DB.partsNeeded || []).filter(function(p){ return assets.indexOf(p.assetId) === -1; });
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast(r.count + ' bike' + (r.count === 1 ? '' : 's') + ' back to Ready to ride');
+    renderWq_();
+  }, function(){ toast('Save failed \u2014 check signal', true); wqChanged_(); });
+}
+
 function wqOpen_(code) {
   current.code = code;
   LOOKUP_CALL(code, function(r){
@@ -851,6 +897,29 @@ function wqOpen_(code) {
     openJob(r.bike, r.history, r.faults);
   }, function(){ toast('Lookup failed \u2014 check signal', true); });
 }
+/* ---- Optional bike on workshop tasks (B27) ---- */
+function wtBikeSearch_() {
+  var box = document.getElementById('wt-bres');
+  var q = document.getElementById('wt-bike').value.trim();
+  var nq = normCode_(q);
+  if (q.length < 2 || !nq) { box.innerHTML = ''; return; }
+  var hits = (DB.bikes || []).filter(function(b){ return normCode_(b.assetId).indexOf(nq) !== -1; }).slice(0, 6);
+  box.innerHTML = hits.map(function(b){
+    return '<div class="mres" onclick="wtBikePick_(\'' + String(b.assetId).replace(/'/g, "\\'") + '\')">' +
+      '<span><b>' + b.assetId + '</b></span><span class="mr-meta">' + (STATUS_LABELS[b.status] || b.status || '') +
+      (b.location ? ' &middot; ' + b.location : '') + '</span></div>';
+  }).join('');
+}
+function wtBikePick_(aid) {
+  document.getElementById('wt-bike').value = aid;
+  document.getElementById('wt-bres').innerHTML = '';
+}
+function wtaskBike_(aid) {
+  var b = null;
+  (DB.bikes || []).some(function(x){ if (x.assetId === aid) { b = x; return true; } });
+  wqOpen_(b && b.barcode ? b.barcode : aid);
+}
+
 function renderWtasks_() {
   var el = document.getElementById('wt-list');
   var list = DB.wtasks || [];
@@ -862,8 +931,11 @@ function renderWtasks_() {
       var tick = (t.row >= 2)
         ? '<input type="checkbox" data-row="' + t.row + '" onchange="wtasksChanged_()">'
         : '<input type="checkbox" disabled>';
+      var bk = t.bike
+        ? '<b onclick="event.preventDefault();event.stopPropagation();wtaskBike_(\'' + String(t.bike).replace(/'/g, "\\'") + '\')" style="color:var(--red);text-decoration:underline">' + t.bike + '</b> \u00b7 '
+        : '';
       return '<label class="chk">' + tick +
-        '<span>' + t.task + ' <span style="color:var(--grey);font-size:12px">' +
+        '<span>' + bk + t.task + ' <span style="color:var(--grey);font-size:12px">' +
         [t.by, age].filter(Boolean).join(' \u00b7 ') + '</span></span></label>';
     }).join('');
   }
@@ -880,11 +952,16 @@ function wtaskAdd_() {
   var inp = document.getElementById('wt-text');
   var t = inp.value.trim();
   if (!t) { toast('Type the task first', true); return; }
-  WTADD_CALL({ task: t, user: user }, function(r){
+  var bk = document.getElementById('wt-bike').value.trim();
+  var nb = normCode_(bk);
+  if (nb) (DB.bikes || []).some(function(b){ if (normCode_(b.assetId) === nb) { bk = b.assetId; return true; } });
+  WTADD_CALL({ task: t, user: user, bike: bk }, function(r){
     if (!r || r.denied) { toast('Workshop PIN needed', true); return; }
     if (r.error) { toast(r.error, true); return; }
     inp.value = '';
-    (DB.wtasks = DB.wtasks || []).push({ row: -1, task: t, by: user, when: new Date().toISOString() });
+    document.getElementById('wt-bike').value = '';
+    document.getElementById('wt-bres').innerHTML = '';
+    (DB.wtasks = DB.wtasks || []).push({ row: -1, task: t, bike: bk, by: user, when: new Date().toISOString() });
     try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
     toast('Task added');
     renderWtasks_();
@@ -1617,6 +1694,7 @@ function CHECK_CALL(p, ok, err) { p.action = 'checklist'; apiPost(p, ok, err); }
 function TOURRET_CALL(p, ok, err) { p.action = 'tourreturn'; apiPost(p, ok, err); }
 function WTADD_CALL(p, ok, err) { p.action = 'wtaskadd'; p.pin = pin; apiPost(p, ok, err); }
 function WTDONE_CALL(rows, ok, err) { apiPost({ action: 'wtasksdone', rows: rows, user: user, pin: pin }, ok, err); }
+function FIXED_CALL(assets, ok, err) { apiPost({ action: 'bikesfixed', assets: assets, user: user, pin: pin }, ok, err); }
 function GTASK_CALL(p, ok, err) { p.action = 'gtask'; p.pin = pin; apiPost(p, ok, err); }
 function ORDER_CALL(o, ok, err) { apiPost({ action: 'orderpart', part: o.part, qty: o.qty, priority: o.priority, brand: o.brand, notes: o.notes, user: user, pin: pin, photo: o.photo || '', photoType: 'image/jpeg' }, ok, err); }
 function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, user: user, pin: pin }, ok, err); }
