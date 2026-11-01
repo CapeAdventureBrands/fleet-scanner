@@ -126,6 +126,10 @@
   .wqrow { display:flex; gap:10px; align-items:flex-start; }
   .wqrow > input { width:22px; height:22px; accent-color:var(--red); flex-shrink:0; margin-top:2px; }
   .wqrow > div { flex:1; min-width:0; }
+  span.rag { display:inline-block; width:18px; height:18px; border-radius:50%; flex-shrink:0; margin-top:2px; }
+  span.rag.tap { cursor:pointer; box-shadow:0 0 0 2px #fff, 0 0 0 4px #BBB; }
+  .rag-R { background:#D2141B; } .rag-A { background:#F0A21A; } .rag-G { background:#1B7A2D; }
+  #wt-who { width:100%; padding:12px; font-size:15px; border:2px solid var(--black); background:#fff; font-family:inherit; border-radius:0; margin-top:8px; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -161,7 +165,7 @@
     <div class="tiles">
       <button class="tile" onclick="chooseSide('guide')">
         <div class="big">Guide</div>
-        <div class="sub">Look up &amp; move bikes, take bikes on tour</div>
+        <div class="sub">Check bikes, move bikes, take bikes on tour</div>
       </button>
       <button class="tile" onclick="chooseSide('workshop')">
         <div class="big">Workshop</div>
@@ -178,8 +182,12 @@
   <section id="view-home" class="hidden">
     <div class="tiles">
       <button class="tile" onclick="go('lookup')" id="tile-lookup">
-        <div class="big">Look up &amp; move</div>
-        <div class="sub">Scan a bike — check it, move it, report a fault</div>
+        <div class="big">Check a bike</div>
+        <div class="sub">Scan or search &mdash; status, faults, report a problem</div>
+      </button>
+      <button class="tile" onclick="go('mv')" id="tile-move">
+        <div class="big">Move bikes</div>
+        <div class="sub">Pick a site, then scan bike after bike &mdash; each scan moves one</div>
       </button>
       <button class="tile" onclick="go('tour')" id="tile-tour">
         <div class="big">Tour bikes</div>
@@ -401,6 +409,8 @@
     <h2>Tasks to complete</h2>
     <p class="note">Written jobs for the workshop &mdash; tick them off as they&rsquo;re done. Outstanding tasks go on the daily 5pm email.</p>
     <input type="text" id="wt-text" autocomplete="off" placeholder="Write a task &mdash; e.g. parts arrived, collect from dealer &amp; fit" style="margin-top:6px">
+    <select id="wt-who"></select>
+    <div id="wt-prio-wrap" style="display:none;margin-top:8px"><div class="chips" id="wt-prio"></div></div>
     <div class="manual" style="margin-top:8px">
       <input type="text" id="wt-bike" autocomplete="off" placeholder="Bike (optional) &mdash; type name, e.g. E-Bike 43" oninput="wtBikeSearch_()">
       <button class="primary" onclick="wtaskAdd_()">Add</button>
@@ -408,6 +418,22 @@
     <div id="wt-bres"></div>
     <div id="wt-list"></div>
     <button class="primary" style="width:100%;margin-top:12px" id="wt-done" onclick="saveWtasks_()" disabled>Tick tasks as you finish them</button>
+  </section>
+
+
+  <!-- MOVE BIKES: batch mover -->
+  <section id="view-mv" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Where are the bikes going?</h2>
+    <p class="note">Pick the destination, then scan bike after bike &mdash; each scan moves one instantly. Status and faults are not touched.</p>
+    <div class="chips" id="mv-loc"></div>
+    <div class="tiles" style="margin-top:16px">
+      <button class="tile" onclick="go('move-scan')">
+        <div class="big">Scan bikes</div>
+        <div class="sub">Each scan moves the bike to the chosen site</div>
+      </button>
+    </div>
+    <div id="mv-done"></div>
   </section>
 
   <!-- TOUR HUB -->
@@ -481,7 +507,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzYhyghwhIpDAYwFjyLM5aq2Yo0ZYASBGd2odNEU-R53Wa0DG_A85bKAM6WAJCzlqnJ/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxc9UKhcFv0WZwVu81JTwM1GK_GOxmwMIcYLZHXsbD0eeBKUSuDeygIdeixZCbpRm-u/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -493,7 +519,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B28';
+var UI_VERSION = 'B30';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -508,6 +534,7 @@ function paintSide_() {
   var showWs = side === 'workshop';
   var vis = {
     'tile-lookup': true,
+    'tile-move': true,
     'tile-tour': !showOffice && !showWs,
     'tile-wq': showOffice || showWs,
     'tile-workshop': showOffice || showWs,
@@ -600,7 +627,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -670,6 +697,15 @@ function go(view) {
   } else if (view === 'gtask') {
     openGtask_();
     show('view-gtask');
+  } else if (view === 'mv') {
+    mvSession = [];
+    renderMv_();
+    show('view-mv');
+  } else if (view === 'move-scan' && !mvLoc) {
+    toast('Pick the destination first', true);
+    renderMv_();
+    show('view-mv');
+    return;
   } else if (view === 'wq') {
     renderWq_();
     show('view-wq');
@@ -692,13 +728,14 @@ function go(view) {
   } else if (view === 'tour-in') {
     renderTourIn_();
     show('view-tourin');
-  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in-scan') {
+  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in-scan' || view === 'move-scan') {
     mode = (view === 'tour-in-scan') ? 'tour-in' : view;
     document.getElementById('scan-title').textContent =
       view === 'assign' ? 'Scan the sticker on the bike'
       : view === 'workshop' ? 'Scan the bike you worked on'
       : view === 'tour-out' ? 'Scan each bike going on tour \u2014 ' + tourLoc
-      : view === 'tour-in-scan' ? 'Scan each bike coming back to ' + tourLoc : 'Scan a bike';
+      : view === 'tour-in-scan' ? 'Scan each bike coming back to ' + tourLoc
+      : view === 'move-scan' ? 'Scan each bike going to ' + mvLoc : 'Scan a bike';
     document.getElementById('manual').value = '';
     var mr = document.getElementById('m-results'); if (mr) mr.innerHTML = '';
     var sb = document.getElementById('snapbtn');
@@ -808,54 +845,106 @@ function renderWq_() {
   (DB.partsNeeded || []).forEach(function(p){
     if (p.assetId && p.assetId !== 'Stock') (openParts[p.assetId] = openParts[p.assetId] || []).push(p);
   });
-  var ready = [], waiting = [], bench = [], pending = [];
+  var faulty = {};
+  (DB.faults || []).forEach(function(f){ faulty[f.assetId] = 1; });
+  var KIND = { ready: [0, 'Ready to fix \u2014 parts in'], bench: [1, 'On the bench'], pending: [2, 'Pending check'],
+               fault: [3, 'Fault reported'], waiting: [4, 'Waiting for parts'] };
+  var items = [];
   bikes.forEach(function(b){
-    if (b.status === 'Waiting for parts') { (openParts[b.assetId] ? waiting : ready).push(b); }
-    else if (b.status === 'Workshop') bench.push(b);
-    else if (b.status === 'Pending') pending.push(b);
+    var k = '';
+    if (b.status === 'Waiting for parts') k = openParts[b.assetId] ? 'waiting' : 'ready';
+    else if (b.status === 'Workshop') k = 'bench';
+    else if (b.status === 'Pending') k = 'pending';
+    else if (faulty[b.assetId]) k = 'fault';
+    if (k) items.push({ b: b, k: k, p: ragOf_(b.priority) });
   });
-  var listed = {};
-  ready.concat(waiting, bench, pending).forEach(function(b){ listed[b.assetId] = 1; });
-  var faultBikes = {};
-  (DB.faults || []).forEach(function(f){ if (!listed[f.assetId]) faultBikes[f.assetId] = 1; });
+  items.sort(function(x, y){
+    return (RAG_RANK[x.p] - RAG_RANK[y.p]) || (KIND[x.k][0] - KIND[y.k][0]) || (tms_(x.b.statusChanged) - tms_(y.b.statusChanged));
+  });
+  var ticked = {};
+  document.querySelectorAll('#wq-list input.wq-tick').forEach(function(b){ if (b.checked) ticked[b.getAttribute('data-aid')] = 1; });
+  var isAdmin = roleRank_(role) >= 2;
   var h = '';
-  function days_(b){
-    var t = openDays_(b.statusChanged).replace('open ', '').replace('logged today', 'today');
-    return t ? ' \u00b7 ' + t : '';
-  }
-  function row_(b, extra){
-    var code = b.barcode || b.assetId;
-    return '<div class="move wqrow">' +
-      '<input type="checkbox" class="wq-tick" data-aid="' + String(b.assetId).replace(/"/g, '&quot;') + '" onchange="wqChanged_()">' +
-      '<div onclick="wqOpen_(\'' + String(code).replace(/'/g, "\\'") + '\')" style="cursor:pointer"><b>' +
-      b.assetId + '</b> \u00b7 ' + (b.location || '?') + days_(b) + (extra || '') + faultLine_(b.assetId) + '</div></div>';
-  }
-  function section_(title, arr, color, extraFn){
-    if (!arr.length) return;
-    h += '<h2' + (color ? ' style="color:' + color + '"' : '') + '>' + title + ' (' + arr.length + ')</h2>';
-    arr.forEach(function(b){ h += row_(b, extraFn ? extraFn(b) : ''); });
-  }
-  section_('Ready to fix \u2014 no parts outstanding', ready, 'var(--red)');
-  section_('Waiting for parts', waiting, '', function(b){
-    return '<div class="meta">\ud83d\udd27 ' + openParts[b.assetId].map(function(p){ return p.part; }).join(' \u00b7 ') + '</div>';
-  });
-  section_('On the bench', bench);
-  section_('Pending check', pending);
-  var fk = Object.keys(faultBikes).sort();
-  if (fk.length) {
-    h += '<h2>Reported faults \u2014 not in workshop yet (' + fk.length + ')</h2>';
-    fk.forEach(function(aid){
-      var b = null;
-      bikes.some(function(x){ if (x.assetId === aid) { b = x; return true; } });
-      if (b) h += row_(b);
+  var redT = (DB.wtasks || []).filter(function(t){ return ragOf_(t.priority) === 'Red'; }).length;
+  if (redT) h += '<div class="move" onclick="go(\'wtasks\')" style="cursor:pointer;color:var(--red)"><b>' + redT +
+                 ' red task' + (redT === 1 ? '' : 's') + '</b> on the task list \u2192</div>';
+  if (isAdmin && items.length) h += '<p class="note">Tap a dot to set priority: amber \u2192 red \u2192 green.</p>';
+  var HEAD = { Red: ['Red \u2014 do today', 'var(--red)'], Amber: ['Amber \u2014 this week', '#B7791F'],
+               Green: ['Green \u2014 when there\u2019s time', '#1B7A2D'] };
+  ['Red', 'Amber', 'Green'].forEach(function(p){
+    var grp = items.filter(function(it){ return it.p === p; });
+    if (!grp.length) return;
+    h += '<h2 style="color:' + HEAD[p][1] + '">' + HEAD[p][0] + ' (' + grp.length + ')</h2>';
+    grp.forEach(function(it){
+      var b = it.b, code = b.barcode || b.assetId;
+      var t = openDays_(b.statusChanged).replace('open ', '').replace('logged today', 'today');
+      var extra = it.k === 'waiting'
+        ? '<div class="meta">\ud83d\udd27 ' + openParts[b.assetId].map(function(x){ return x.part; }).join(' \u00b7 ') + '</div>' : '';
+      var auto = (b.prioAuto && p === 'Red') ? ' <span style="color:var(--red);font-size:12px">safety</span>' : '';
+      h += '<div class="move wqrow">' +
+        '<input type="checkbox" class="wq-tick" data-aid="' + String(b.assetId).replace(/"/g, '&quot;') + '"' +
+        (ticked[b.assetId] ? ' checked' : '') + ' onchange="wqChanged_()">' +
+        ragDot_(p, isAdmin ? 'cycleBikePrio_(\'' + jsq_(b.assetId) + '\')' : '') +
+        '<div onclick="wqOpen_(\'' + jsq_(code) + '\')" style="cursor:pointer"><b>' + b.assetId + '</b> \u00b7 ' +
+        KIND[it.k][1] + auto + '<div class="meta">' + (b.location || '?') + (t ? ' \u00b7 ' + t : '') + '</div>' +
+        extra + faultLine_(b.assetId) + '</div></div>';
     });
-  }
-  el.innerHTML = h || '<p class="note">Nothing needs attention \u2014 clean bench.</p>';
+  });
+  if (!items.length) h += '<p class="note">Nothing needs attention \u2014 clean bench.</p>';
+  el.innerHTML = h;
   var qb = document.getElementById('wq-done');
-  if (qb) qb.style.display = h ? '' : 'none';
+  if (qb) qb.style.display = items.length ? '' : 'none';
   wqChanged_();
 }
 /* ---- Tick bikes as sorted (B28) ---- */
+/* ---- RAG priority (B30) ---- */
+var SAFETY_RE = /brake|steer|headset|battery|power|on\/off|on off/i;
+var RAG_RANK = { Red: 0, Amber: 1, Green: 2 };
+var RAG_NEXT = { Amber: 'Red', Red: 'Green', Green: 'Amber' };
+var prioTimers = {};
+var wtPrio = 'Amber';
+function ragOf_(p) { return (p === 'Red' || p === 'Green') ? p : 'Amber'; }
+function tms_(s) { var d = new Date(s); return isNaN(d) ? 9e15 : d.getTime(); }
+function jsq_(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+function ragDot_(p, onclick) {
+  return '<span class="rag rag-' + p.charAt(0) + (onclick ? ' tap' : '') + '" title="' + p + (onclick ? ' \u2014 tap to change' : '') + '"' +
+    (onclick ? ' onclick="event.preventDefault();event.stopPropagation();' + onclick + '"' : '') + '></span>';
+}
+function cycleBikePrio_(aid) {
+  var b = null;
+  (DB.bikes || []).some(function(x){ if (x.assetId === aid) { b = x; return true; } });
+  if (!b) return;
+  b.priority = RAG_NEXT[ragOf_(b.priority)];
+  b.prioAuto = false;
+  try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+  renderWq_();
+  toast(aid + ' \u2192 ' + b.priority);
+  clearTimeout(prioTimers['b' + aid]);
+  prioTimers['b' + aid] = setTimeout(function(){
+    PRIO_CALL({ assetId: aid, prio: b.priority }, function(r){
+      if (!r || r.denied) toast('Management PIN needed to set priority', true);
+      else if (r.error) toast(r.error, true);
+    }, function(){ toast('Priority not saved \u2014 check signal', true); });
+  }, 900);
+}
+function cycleTaskPrio_(row) {
+  if (row < 2) { toast('Just added \u2014 give it a second, then refresh', true); return; }
+  var t = null;
+  (DB.wtasks || []).some(function(x){ if (x.row === row) { t = x; return true; } });
+  if (!t) return;
+  t.priority = RAG_NEXT[ragOf_(t.priority)];
+  try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+  renderWtasks_();
+  toast('Task \u2192 ' + t.priority);
+  clearTimeout(prioTimers['t' + row]);
+  prioTimers['t' + row] = setTimeout(function(){
+    TPRIO_CALL({ row: row, prio: t.priority }, function(r){
+      if (!r || r.denied) toast('Management PIN needed to set priority', true);
+      else if (r.error) toast(r.error, true);
+    }, function(){ toast('Priority not saved \u2014 check signal', true); });
+  }, 900);
+}
+
 function wqChanged_() {
   var n = 0;
   document.querySelectorAll('#wq-list input.wq-tick').forEach(function(b){ if (b.checked) n++; });
@@ -922,20 +1011,39 @@ function wtaskBike_(aid) {
 
 function renderWtasks_() {
   var el = document.getElementById('wt-list');
-  var list = DB.wtasks || [];
+  var isAdmin = roleRank_(role) >= 2;
+  var pw = document.getElementById('wt-prio-wrap');
+  if (pw) {
+    pw.style.display = isAdmin ? '' : 'none';
+    if (isAdmin) chipRow('wt-prio', ['Red', 'Amber', 'Green'], wtPrio, function(v){ wtPrio = v; });
+  }
+  var sel = document.getElementById('wt-who');
+  if (sel) {
+    var keep = sel.value || '';
+    sel.innerHTML = '<option value="">Assign to: anyone in the workshop</option>' + (DB.people || []).map(function(p){
+      return '<option value="' + String(p.name).replace(/"/g, '&quot;') + '"' + (p.name === keep ? ' selected' : '') + '>Assign to: ' + p.name + '</option>';
+    }).join('');
+  }
+  var ticked = {};
+  document.querySelectorAll('#wt-list input').forEach(function(b){ if (b.checked) ticked[b.getAttribute('data-row')] = 1; });
+  var list = (DB.wtasks || []).slice().sort(function(a, b){
+    return (RAG_RANK[ragOf_(a.priority)] - RAG_RANK[ragOf_(b.priority)]) || (tms_(a.when) - tms_(b.when));
+  });
   if (!list.length) {
     el.innerHTML = '<p class="note">No open tasks \u2014 the list is clear.</p>';
   } else {
     el.innerHTML = list.map(function(t){
+      var p = ragOf_(t.priority);
       var age = openDays_(t.when).replace('open ', '').replace('logged today', 'added today');
       var tick = (t.row >= 2)
-        ? '<input type="checkbox" data-row="' + t.row + '" onchange="wtasksChanged_()">'
+        ? '<input type="checkbox" data-row="' + t.row + '"' + (ticked[String(t.row)] ? ' checked' : '') + ' onchange="wtasksChanged_()">'
         : '<input type="checkbox" disabled>';
       var bk = t.bike
-        ? '<b onclick="event.preventDefault();event.stopPropagation();wtaskBike_(\'' + String(t.bike).replace(/'/g, "\\'") + '\')" style="color:var(--red);text-decoration:underline">' + t.bike + '</b> \u00b7 '
+        ? '<b onclick="event.preventDefault();event.stopPropagation();wtaskBike_(\'' + jsq_(t.bike) + '\')" style="color:var(--red);text-decoration:underline">' + t.bike + '</b> \u00b7 '
         : '';
-      return '<label class="chk">' + tick +
-        '<span>' + bk + t.task + ' <span style="color:var(--grey);font-size:12px">' +
+      var who = t.assignee ? '<b style="color:var(--black)">\u2192 ' + (t.assignee === user ? 'you' : t.assignee) + '</b> \u00b7 ' : '';
+      return '<label class="chk">' + tick + ragDot_(p, (isAdmin && t.row >= 2) ? 'cycleTaskPrio_(' + t.row + ')' : '') +
+        '<span>' + bk + t.task + ' <span style="color:var(--grey);font-size:12px">' + who +
         [t.by, age].filter(Boolean).join(' \u00b7 ') + '</span></span></label>';
     }).join('');
   }
@@ -955,15 +1063,21 @@ function wtaskAdd_() {
   var bk = document.getElementById('wt-bike').value.trim();
   var nb = normCode_(bk);
   if (nb) (DB.bikes || []).some(function(b){ if (normCode_(b.assetId) === nb) { bk = b.assetId; return true; } });
-  WTADD_CALL({ task: t, user: user, bike: bk }, function(r){
+  var sel = document.getElementById('wt-who');
+  var who = sel ? (sel.value || '') : '';
+  var pr = roleRank_(role) >= 2 ? wtPrio : '';
+  WTADD_CALL({ task: t, user: user, bike: bk, prio: pr, assignee: who }, function(r){
     if (!r || r.denied) { toast('Workshop PIN needed', true); return; }
     if (r.error) { toast(r.error, true); return; }
     inp.value = '';
     document.getElementById('wt-bike').value = '';
     document.getElementById('wt-bres').innerHTML = '';
-    (DB.wtasks = DB.wtasks || []).push({ row: -1, task: t, bike: bk, by: user, when: new Date().toISOString() });
+    if (sel) sel.value = '';
+    var fp = (pr === 'Red' || pr === 'Green') ? pr : (SAFETY_RE.test(t) ? 'Red' : 'Amber');
+    wtPrio = 'Amber';
+    (DB.wtasks = DB.wtasks || []).push({ row: -1, task: t, bike: bk, by: user, priority: fp, assignee: who, when: new Date().toISOString() });
     try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
-    toast('Task added');
+    toast('Task added' + (who ? ' for ' + who : '') + ' \u2014 ' + fp);
     renderWtasks_();
   }, function(){ toast('Save failed \u2014 check signal', true); });
 }
@@ -1079,6 +1193,17 @@ function onCode(code) {
       toast(r.assetId + (dir === 'out' ? ' \u2014 out at ' + tourLoc + ' (' + tourSession.length + ')' : ' \u2014 back in at ' + tourLoc));
       goTour_();            // straight back to the scanner \u2014 next bike
     }, function(){ toast('Save failed \u2014 check signal', true); goTour_(); });
+  } else if (mode === 'move-scan') {
+    BMOVE_CALL(code, function(r){
+      if (r && r.notFound) { toast('No bike carries ' + code + ' \u2014 assign it first', true); go('move-scan'); return; }
+      if (!r || !r.ok) { toast('Server is running old code \u2014 redeploy Code.gs (New version)', true); go('home'); return; }
+      var aid = r.assetId || code;
+      (DB.bikes || []).some(function(b){ if (b.assetId === aid) { b.location = mvLoc; return true; } });
+      try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+      mvSession.push(aid);
+      toast(aid + ' \u2192 ' + mvLoc + ' (' + mvSession.length + ')');
+      go('move-scan');
+    }, function(){ toast('Save failed \u2014 check signal', true); go('move-scan'); });
   } else if (mode === 'workshop') {
     var onFound = function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet — assign it first', true); go('workshop'); return; }
@@ -1692,9 +1817,12 @@ function REPORT_CALL(days, ok, err) { apiPost({ action: 'report', days: days, pi
 function TOUR_CALL(p, ok, err) { p.action = 'tour'; apiPost(p, ok, err); }
 function CHECK_CALL(p, ok, err) { p.action = 'checklist'; apiPost(p, ok, err); }
 function TOURRET_CALL(p, ok, err) { p.action = 'tourreturn'; apiPost(p, ok, err); }
+function BMOVE_CALL(code, ok, err) { apiPost({ action: 'move', barcode: code, newLocation: mvLoc, newStatus: '', user: user }, ok, err); }
 function WTADD_CALL(p, ok, err) { p.action = 'wtaskadd'; p.pin = pin; apiPost(p, ok, err); }
 function WTDONE_CALL(rows, ok, err) { apiPost({ action: 'wtasksdone', rows: rows, user: user, pin: pin }, ok, err); }
 function FIXED_CALL(assets, ok, err) { apiPost({ action: 'bikesfixed', assets: assets, user: user, pin: pin }, ok, err); }
+function PRIO_CALL(p, ok, err) { apiPost({ action: 'setprio', assetId: p.assetId, prio: p.prio, user: user, pin: pin }, ok, err); }
+function TPRIO_CALL(p, ok, err) { apiPost({ action: 'taskprio', row: p.row, prio: p.prio, user: user, pin: pin }, ok, err); }
 function GTASK_CALL(p, ok, err) { p.action = 'gtask'; p.pin = pin; apiPost(p, ok, err); }
 function ORDER_CALL(o, ok, err) { apiPost({ action: 'orderpart', part: o.part, qty: o.qty, priority: o.priority, brand: o.brand, notes: o.notes, user: user, pin: pin, photo: o.photo || '', photoType: 'image/jpeg' }, ok, err); }
 function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, user: user, pin: pin }, ok, err); }
@@ -1705,6 +1833,30 @@ function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, er
 /* ---------- tour hub ---------- */
 var tourSession = [];
 var tourLoc = '';
+/* ---- Batch bike mover (B29) ---- */
+var mvLoc = '';
+var mvSession = [];
+function renderMv_() {
+  var el = document.getElementById('mv-loc');
+  el.innerHTML = '';
+  (DB.locations || []).filter(function(l){ return l !== 'In Transit'; }).forEach(function(l){
+    var b = document.createElement('button');
+    b.className = 'chip' + (l === mvLoc ? ' on' : '');
+    b.textContent = l;
+    b.onclick = function(){
+      mvLoc = l;
+      Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
+      b.classList.add('on');
+    };
+    el.appendChild(b);
+  });
+  var dn = document.getElementById('mv-done');
+  dn.innerHTML = mvSession.length
+    ? '<h2>Moved this session (' + mvSession.length + ')</h2><div class="move"><div class="meta">' +
+      mvSession.join(' \u00b7 ') + '</div></div>'
+    : '';
+}
+
 function renderTourLoc_() {
   var el = document.getElementById('t-loc');
   el.innerHTML = '';
