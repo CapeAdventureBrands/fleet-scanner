@@ -283,7 +283,7 @@
 
     <h2>What&rsquo;s where, by size</h2>
     <div class="chips" id="d-filters"></div>
-    <p class="note">Big number = ready to ride. Red = nothing at a selling site. Amber = down to one. Tap a cell for the bikes.</p>
+    <p class="note">Each cell = ready / total at that site. Red = nothing ready at a selling site. Amber = only one ready. Tap a cell for the bikes.</p>
     <div id="d-matrix" style="overflow-x:auto"></div>
     <div id="d-celllist"></div>
 
@@ -1488,32 +1488,35 @@ function renderDash() {
   function cellBikes(size, site) {
     return pool.filter(function(b){ return bucketSize_(b) === size && b.location === site; });
   }
-  var html = '<table class="dash"><tr><th>Size</th>';
+  var html = '<p class="note" style="margin-top:4px"><b>Showing: ' +
+    (dashFilter === 'All' ? 'all active bikes' : dashFilter) + '</b></p>';
+  html += '<table class="dash"><tr><th>Size</th>';
   SITES.forEach(function(s){ html += '<th>' + s.name + '<small>' + s.type + '</small></th>'; });
-  html += '<th>Total</th></tr>';
-  var readyCol = {};
+  html += '<th>Ready</th><th>Not ready</th><th>Total</th></tr>';
+  var colReady = {}, colAll = {}, gReady = 0, gAll = 0;
   sizes.forEach(function(size){
-    var rowTotal = 0;
-    var cells = '';
+    var rReady = 0, rAll = 0, cells = '';
     SITES.forEach(function(site){
       var here = cellBikes(size, site.name);
       var r = here.filter(function(b){ return b.status === 'Available'; }).length;
-      var down = here.length - r;
-      rowTotal += here.length;
-      readyCol[site.name] = (readyCol[site.name] || 0) + r;
+      rReady += r; rAll += here.length;
+      colReady[site.name] = (colReady[site.name] || 0) + r;
+      colAll[site.name] = (colAll[site.name] || 0) + here.length;
       var cls = '';
-      if (site.type === 'SELLING') {
-        if (r === 0) cls = 'bad'; else if (r === 1) cls = 'warn';
-      }
-      cells += '<td class="' + cls + '" onclick="showCell(\'' + size.replace(/'/g,"\\'") + '\',\'' + site.name + '\')">' + r +
-               (down ? '<span class="down">' + down + ' down</span>' : '') + '</td>';
+      if (site.type === 'SELLING') { if (r === 0) cls = 'bad'; else if (r === 1) cls = 'warn'; }
+      cells += '<td class="' + cls + '" onclick="showCell(\'' + size.replace(/'/g,"\\'") + '\',\'' + site.name + '\')">' +
+               (here.length ? '<b>' + r + '</b> / ' + here.length : '&ndash;') + '</td>';
     });
-    html += '<tr><td>' + size + '</td>' + cells + '<td><b>' + rowTotal + '</b></td></tr>';
+    gReady += rReady; gAll += rAll;
+    html += '<tr><td>' + size + '</td>' + cells +
+            '<td><b>' + rReady + '</b></td><td>' + (rAll - rReady) + '</td><td>' + rAll + '</td></tr>';
   });
-  html += '<tr class="total"><td>READY</td>';
-  var readyShown = 0;
-  SITES.forEach(function(s){ var n = readyCol[s.name] || 0; readyShown += n; html += '<td>' + n + '</td>'; });
-  html += '<td>' + readyShown + '</td></tr></table>';
+  html += '<tr class="total"><td>ALL</td>';
+  SITES.forEach(function(s){ html += '<td>' + (colReady[s.name] || 0) + ' / ' + (colAll[s.name] || 0) + '</td>'; });
+  html += '<td>' + gReady + '</td><td>' + (gAll - gReady) + '</td><td>' + gAll + '</td></tr></table>';
+  var outside = pool.length - gAll;
+  if (outside > 0) html += '<p class="note">+ ' + outside + ' bike' + (outside === 1 ? '' : 's') +
+    ' not at these four sites (in transit, no location or elsewhere) &mdash; not counted above.</p>';
   document.getElementById('d-matrix').innerHTML = html;
   document.getElementById('d-celllist').innerHTML = '';
 
