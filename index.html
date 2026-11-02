@@ -283,7 +283,7 @@
 
     <h2>What&rsquo;s where, by size</h2>
     <div class="chips" id="d-filters"></div>
-    <p class="note">Each cell = ready / total at that site. Red = nothing ready at a selling site. Amber = only one ready. Tap a cell for the bikes.</p>
+    <p class="note">Each cell = ready / total at that site. Red = nothing ready at a tour site. Amber = only one ready. Tap a cell for the bikes.</p>
     <div id="d-matrix" style="overflow-x:auto"></div>
     <div id="d-celllist"></div>
 
@@ -1401,9 +1401,9 @@ function saveMove() {
 /* ---------- ops dashboard ---------- */
 var SITES = [
   { name: 'Workshop', type: 'HOLDING' },
-  { name: 'Cape Town', type: 'HOLDING' },
-  { name: 'Stellenbosch', type: 'SELLING' },
-  { name: 'Franschhoek', type: 'SELLING' }
+  { name: 'Cape Town', type: 'TOUR' },
+  { name: 'Stellenbosch', type: 'TOUR' },
+  { name: 'Franschhoek', type: 'TOUR' }
 ];
 var dashFilter = 'All';
 var STATUS_COLORS = { 'Available':'#1B7A3D', 'On tour':'#1D5FBF', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Pending':'#6E4A9E', 'Out of Service':'#D2141B', 'Retired':'#555555', 'Other':'#888888' };
@@ -1446,11 +1446,11 @@ function renderDash() {
   var ready = counts['Available'] || 0;
   var pct = total ? Math.round(ready / total * 100) : 0;
   var atHub = bikes.filter(function(b){
-    return b.status === 'Available' && (b.location === 'Workshop' || b.location === 'Cape Town');
+    return b.status === 'Available' && b.location === 'Workshop';
   }).length;
   document.getElementById('d-pct').textContent = pct + '%';
   document.getElementById('d-ready-sub').innerHTML =
-    ready + ' of ' + total + ' bikes' + (atHub ? '<br>' + atHub + ' ready but sitting at a hub' : '');
+    ready + ' of ' + total + ' bikes' + (atHub ? '<br>' + atHub + ' ready but sitting at the workshop' : '');
   var bar = '', leg = '';
   DB.statuses.forEach(function(st){
     var n = counts[st] || 0;
@@ -1503,7 +1503,7 @@ function renderDash() {
       colReady[site.name] = (colReady[site.name] || 0) + r;
       colAll[site.name] = (colAll[site.name] || 0) + here.length;
       var cls = '';
-      if (site.type === 'SELLING') { if (r === 0) cls = 'bad'; else if (r === 1) cls = 'warn'; }
+      if (site.type === 'TOUR') { if (r === 0) cls = 'bad'; else if (r === 1) cls = 'warn'; }
       cells += '<td class="' + cls + '" onclick="showCell(\'' + size.replace(/'/g,"\\'") + '\',\'' + site.name + '\')">' +
                (here.length ? '<b>' + r + '</b> / ' + here.length : '&ndash;') + '</td>';
     });
@@ -1520,10 +1520,10 @@ function renderDash() {
   document.getElementById('d-matrix').innerHTML = html;
   document.getElementById('d-celllist').innerHTML = '';
 
-  /* gaps: selling site with no ready stock while another site has 2+ */
+  /* gaps: tour site with no ready stock while another site has 2+ */
   var gaps = '';
   sizes.forEach(function(size){
-    SITES.filter(function(s){ return s.type === 'SELLING'; }).forEach(function(sell){
+    SITES.filter(function(s){ return s.type === 'TOUR'; }).forEach(function(sell){
       var here = cellBikes(size, sell.name).filter(function(b){ return b.status === 'Available'; }).length;
       if (here !== 0) return;
       var best = null;
