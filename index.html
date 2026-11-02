@@ -1400,8 +1400,7 @@ function saveMove() {
 
 /* ---------- ops dashboard ---------- */
 var SITES = [
-  { name: 'Workshop', type: 'HOLDING' },
-  { name: 'Cape Town', type: 'TOUR' },
+  { name: 'Workshop', label: 'Warehouse', type: 'HOLDING' },
   { name: 'Stellenbosch', type: 'TOUR' },
   { name: 'Franschhoek', type: 'TOUR' }
 ];
@@ -1450,7 +1449,7 @@ function renderDash() {
   }).length;
   document.getElementById('d-pct').textContent = pct + '%';
   document.getElementById('d-ready-sub').innerHTML =
-    ready + ' of ' + total + ' bikes' + (atHub ? '<br>' + atHub + ' ready but sitting at the workshop' : '');
+    ready + ' of ' + total + ' bikes' + (atHub ? '<br>' + atHub + ' ready but sitting at the warehouse' : '');
   var bar = '', leg = '';
   DB.statuses.forEach(function(st){
     var n = counts[st] || 0;
@@ -1491,7 +1490,7 @@ function renderDash() {
   var html = '<p class="note" style="margin-top:4px"><b>Showing: ' +
     (dashFilter === 'All' ? 'all active bikes' : dashFilter) + '</b></p>';
   html += '<table class="dash"><tr><th>Size</th>';
-  SITES.forEach(function(s){ html += '<th>' + s.name + '<small>' + s.type + '</small></th>'; });
+  SITES.forEach(function(s){ html += '<th>' + (s.label || s.name) + '<small>' + s.type + '</small></th>'; });
   html += '<th>Ready</th><th>Not ready</th><th>Total</th></tr>';
   var colReady = {}, colAll = {}, gReady = 0, gAll = 0;
   sizes.forEach(function(size){
@@ -1516,7 +1515,7 @@ function renderDash() {
   html += '<td>' + gReady + '</td><td>' + (gAll - gReady) + '</td><td>' + gAll + '</td></tr></table>';
   var outside = pool.length - gAll;
   if (outside > 0) html += '<p class="note">+ ' + outside + ' bike' + (outside === 1 ? '' : 's') +
-    ' not at these four sites (in transit, no location or elsewhere) &mdash; not counted above.</p>';
+    ' not at the warehouse, Stellenbosch or Franschhoek (in transit, no location or elsewhere) &mdash; not counted above.</p>';
   document.getElementById('d-matrix').innerHTML = html;
   document.getElementById('d-celllist').innerHTML = '';
 
@@ -1530,7 +1529,7 @@ function renderDash() {
       SITES.forEach(function(src){
         if (src.name === sell.name) return;
         var n = cellBikes(size, src.name).filter(function(b){ return b.status === 'Available'; }).length;
-        if (n >= 2 && (!best || n > best.n)) best = { name: src.name, n: n };
+        if (n >= 2 && (!best || n > best.n)) best = { name: src.label || src.name, n: n };
       });
       if (best) {
         var cat = dashFilter === 'All' ? '' : ' ' + dashFilter;
