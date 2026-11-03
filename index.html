@@ -463,6 +463,12 @@
     <h2>Where is the tour?</h2>
     <p class="note">Pick the site first. Scanning OUT marks bikes on tour there; scanning BACK IN returns them to this site &mdash; change it if the trailer drops them somewhere else.</p>
     <div class="chips" id="t-loc"></div>
+    <div id="t-multi" style="display:none;margin-top:12px">
+      <input type="text" id="t-mname" autocomplete="off" placeholder="Tour name (optional) &mdash; e.g. Overberg 3-day">
+      <p class="note" style="margin:10px 0 0">Bikes due back on</p>
+      <div class="chips" id="t-mback"></div>
+      <input type="date" id="t-mdate" style="margin-top:8px" onchange="multiBack=this.value;paintMulti_()">
+    </div>
     <div class="tiles" style="margin-top:16px">
       <button class="tile" onclick="go('tour-out')">
         <div class="big">Scan bikes OUT</div>
@@ -528,7 +534,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzEhn40UIZJ_DLSIPSx59Z627IE7PG_PMwSks8D5acZcPBxRjkAELJU7kElW7TsQNL9/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzGTMwHKMIwWBVzriM1EIS6WApj7P2fvxdvUX1iYn5zohBuwFflfmvqcn89lx3iqUpL/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -541,7 +547,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B32';
+var UI_VERSION = 'B33';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -790,7 +796,7 @@ function greetHtml_(period) {
     sub = (tt && (tt.out || tt.back))
       ? tt.out + ' bike' + (tt.out === 1 ? '' : 's') + ' out, ' + tt.back + ' back in today'
       : 'Thanks for today';
-    var mine = (DB.onTour || []).filter(function(t){ return t.guide === user; });
+    var mine = (DB.onTour || []).filter(function(t){ return t.guide === user && !notDueYet_(t); });
     if (mine.length) {
       extra = '<div class="gwarn"><span>\u26a0 ' + mine.map(function(t){ return t.assetId; }).join(', ') +
         ' still out under your name</span><button class="quiet" onclick="go(\'tour\')">Check in</button></div>';
@@ -909,7 +915,7 @@ function go(view) {
     ? 'Scanning as <b>' + user + '</b> \u00b7 <a href="#" onclick="switchUser();return false">not you?</a>' : '';
   if (view === 'home') {
     var tagged = DB.bikes.filter(function(b){ return b.barcode; }).length;
-    var mine = (DB.onTour || []).filter(function(t){ return t.guide === user; });
+    var mine = (DB.onTour || []).filter(function(t){ return t.guide === user && !notDueYet_(t); });
     document.getElementById('progress').innerHTML =
       tagged + ' of ' + DB.bikes.length + ' bikes tagged' +
       (mine.length ? '<br><b style="color:var(--red)">⚠ You still have ' + mine.length + ' bike' +
@@ -952,6 +958,16 @@ function go(view) {
     show('view-tour');
   } else if ((view === 'tour-out' || view === 'tour-in' || view === 'tour-in-scan') && !tourLoc) {
     toast('Pick the tour site first', true);
+    renderTourHub();
+    show('view-tour');
+    return;
+  } else if ((view === 'tour-in' || view === 'tour-in-scan') && tourLoc === MULTI) {
+    toast('Pick the site the bikes are coming back to', true);
+    renderTourHub();
+    show('view-tour');
+    return;
+  } else if (view === 'tour-out' && tourLoc === MULTI && !(multiBack > isoDay_(new Date()))) {
+    toast('Pick the day the bikes are due back', true);
     renderTourHub();
     show('view-tour');
     return;
@@ -1406,7 +1422,9 @@ function onCode(code) {
     show('view-pick');
   } else if (mode === 'tour-out' || mode === 'tour-in') {
     var dir = mode === 'tour-out' ? 'out' : 'in';
-    TOUR_CALL({ barcode: code, dir: dir, user: user, location: tourLoc }, function(r){
+    TOUR_CALL({ barcode: code, dir: dir, user: user, location: tourLoc,
+      dueBack: (dir === 'out' && tourLoc === MULTI) ? multiBack : '',
+      note: (dir === 'out' && tourLoc === MULTI) ? (document.getElementById('t-mname').value || '').trim() : '' }, function(r){
       if (!r || r.error || !r.assetId && !r.notFound && !r.blocked) {
         toast('Server is running old code \u2014 redeploy Code.gs (New version)', true); go('home'); return;
       }
@@ -1414,7 +1432,8 @@ function onCode(code) {
       if (r.blocked) { toast(r.assetId + ' is ' + r.status + ' \u2014 not tour-ready', true); goTour_(); return; }
       if (r.already) { toast(r.assetId + ' is already out', true); goTour_(); return; }
       DB.onTour = (DB.onTour || []).filter(function(t){ return t.assetId !== r.assetId; });
-      if (dir === 'out') DB.onTour.push({ assetId: r.assetId, guide: user, when: new Date().toISOString(), location: tourLoc });
+      if (dir === 'out') DB.onTour.push({ assetId: r.assetId, guide: user, when: new Date().toISOString(), location: tourLoc,
+        dueBack: tourLoc === MULTI ? multiBack : '', note: tourLoc === MULTI ? (document.getElementById('t-mname').value || '').trim() : '' });
       (DB.bikes || []).some(function(b){
         if (b.assetId === r.assetId) {
           b.status = dir === 'out' ? 'On tour' : 'Available';
@@ -1837,6 +1856,8 @@ function renderDash() {
         var d0 = new Date(items[0].when), since = '';
         if (!isNaN(d0)) since = ' \u00b7 since ' + ('0'+d0.getHours()).slice(-2) + ':' + ('0'+d0.getMinutes()).slice(-2);
         var site2 = items[0].location ? ' \u00b7 ' + items[0].location : '';
+        var ml2 = multiLabel_(items[0]);
+        if (ml2) since = ' \u00b7 ' + ml2;
         th2 += '<div class="move"><b>' + g + '</b>' + site2 + ' \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') + since +
                '<div class="meta">' + items.map(function(t){ return t.assetId; }).join(' \u00b7 ') + '</div></div>';
       });
@@ -2092,9 +2113,48 @@ function renderMv_() {
     : '';
 }
 
+/* ---- Multi-day tours (B33) ---- */
+var MULTI = 'Multi-day tour';
+var multiBack = '';
+function isoDay_(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function niceDay_(iso) {
+  var p = String(iso || '').split('-');
+  if (p.length < 3) return iso;
+  var d = new Date(+p[0], +p[1] - 1, +p[2]);
+  return DAYS_[d.getDay()].slice(0, 3) + ' ' + d.getDate() + ' ' + MON_[d.getMonth()];
+}
+function notDueYet_(t) { return !!(t && t.dueBack && t.dueBack > isoDay_(new Date())); }
+function multiLabel_(t) {
+  if (!t || !t.dueBack) return '';
+  return (t.note ? t.note + ' \u00b7 ' : 'Multi-day \u00b7 ') +
+    (notDueYet_(t) ? 'back ' + niceDay_(t.dueBack) : '<b style="color:var(--red)">overdue since ' + niceDay_(t.dueBack) + '</b>');
+}
+function paintMulti_() {
+  var box = document.getElementById('t-multi');
+  if (!box) return;
+  box.style.display = tourLoc === MULTI ? '' : 'none';
+  if (tourLoc !== MULTI) return;
+  var now = new Date(), el = document.getElementById('t-mback');
+  el.innerHTML = '';
+  for (var i = 1; i <= 5; i++) {
+    (function(iso){
+      var b = document.createElement('button');
+      b.className = 'chip' + (iso === multiBack ? ' on' : '');
+      b.textContent = niceDay_(iso);
+      b.onclick = function(){ multiBack = iso; document.getElementById('t-mdate').value = iso; paintMulti_(); };
+      el.appendChild(b);
+    })(isoDay_(new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)));
+  }
+}
+
 function renderTourLoc_() {
   var el = document.getElementById('t-loc');
   el.innerHTML = '';
+  function pick_(btn) {
+    Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
+    btn.classList.add('on');
+    paintMulti_();
+  }
   DB.locations.filter(function(l){ return l !== 'In Transit'; }).forEach(function(l){
     var b = document.createElement('button');
     b.className = 'chip' + (l === tourLoc ? ' on' : '');
@@ -2102,11 +2162,16 @@ function renderTourLoc_() {
     b.onclick = function(){
       tourLoc = l;
       try { localStorage.setItem('cab_site', l); } catch(e) {}
-      Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
-      b.classList.add('on');
+      pick_(b);
     };
     el.appendChild(b);
   });
+  var md = document.createElement('button');
+  md.className = 'chip' + (tourLoc === MULTI ? ' on' : '');
+  md.textContent = MULTI;
+  md.onclick = function(){ tourLoc = MULTI; pick_(md); };
+  el.appendChild(md);
+  paintMulti_();
 }
 /* ---- Pre-tour checklist (B22) ---- */
 var CHECKLIST_DEFAULT = ['Area cleaned','Welcome sign out','Enough bikes out + a few extras',
@@ -2169,6 +2234,8 @@ function renderTourHub(fresh) {
       var d = new Date(items[0].when);
       if (!isNaN(d)) since = ' \u00b7 since ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
       var site = items[0].location ? ' \u00b7 ' + items[0].location : '';
+      var ml = multiLabel_(items[0]);
+      if (ml) since = ' \u00b7 ' + ml;
       h += '<div class="move"><b>' + g + '</b>' + site + ' \u00b7 ' + items.length + ' bike' + (items.length > 1 ? 's' : '') + since +
            '<div class="meta">' + items.map(function(t){ return t.assetId; }).join(' \u00b7 ') + '</div></div>';
     });
