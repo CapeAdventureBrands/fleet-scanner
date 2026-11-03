@@ -130,6 +130,26 @@
   span.rag.tap { cursor:pointer; box-shadow:0 0 0 2px #fff, 0 0 0 4px #BBB; }
   .rag-R { background:#D2141B; } .rag-A { background:#F0A21A; } .rag-G { background:#1B7A2D; }
   #wt-who { width:100%; padding:12px; font-size:15px; border:2px solid var(--black); background:#fff; font-family:inherit; border-radius:0; margin-top:8px; }
+  .greet { border:2px solid var(--black); padding:14px; margin-bottom:12px; background:#fff; }
+  .greet .hn { display:flex; gap:12px; align-items:flex-start; }
+  .greet .hav { width:56px; height:56px; border-radius:50%; flex-shrink:0; overflow:hidden; background:#E1F5EE; }
+  .greet .hav img, .greet .hav svg { width:100%; height:100%; object-fit:cover; display:block; }
+  .greet .gh { font-family:'Montserrat',sans-serif; font-weight:800; font-size:17px; }
+  .greet .gs { font-size:13px; color:var(--grey); margin-top:2px; }
+  .greet .hq { background:#F5F5F5; padding:10px 12px; margin-top:10px; font-size:14px; line-height:1.5; font-style:italic; }
+  .greet .hs { font-size:12px; color:var(--grey); margin-top:4px; font-style:normal; }
+  .greet .gchips span { display:inline-block; font-size:12px; padding:4px 10px; border:1px solid var(--line); margin:8px 6px 0 0; }
+  .greet .gwarn { background:#FAEEDA; color:#633806; padding:8px 10px; margin-top:10px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; }
+  .greet .gwarn button { width:auto; padding:6px 12px; margin:0; }
+  .greet.small { padding:8px 12px; display:flex; gap:10px; align-items:center; cursor:pointer; font-size:13px; }
+  .greet.small .hav { width:30px; height:30px; }
+  .bday { background:#FBEAF0; border:2px solid #D4537E; padding:14px; margin-bottom:12px; color:#72243E; }
+  .bday .bt { font-family:'Montserrat',sans-serif; font-weight:800; font-size:17px; }
+  .bday .bs { font-size:13px; margin-top:2px; }
+  .bday .brow { display:flex; justify-content:space-between; align-items:center; margin-top:10px; font-size:13px; }
+  .bday .brow button { width:auto; padding:6px 12px; margin:0; }
+  .soon { font-size:12px; margin:-4px 0 12px; color:var(--grey); }
+  .soon .chiplite { display:inline-block; padding:4px 10px; border:1px solid var(--line); margin:4px 6px 0 0; color:var(--black); }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -180,6 +200,7 @@
 
   <!-- HOME -->
   <section id="view-home" class="hidden">
+    <div id="home-greet"></div>
     <div class="tiles">
       <button class="tile" onclick="go('lookup')" id="tile-lookup">
         <div class="big">Check a bike</div>
@@ -283,7 +304,7 @@
 
     <h2>What&rsquo;s where, by size</h2>
     <div class="chips" id="d-filters"></div>
-    <p class="note">Each cell = ready / total at that site. Red = nothing ready at a tour site. Amber = only one ready. Tap a cell for the bikes.</p>
+    <p class="note">Big number = ready to ride. Red = nothing at a selling site. Amber = down to one. Tap a cell for the bikes.</p>
     <div id="d-matrix" style="overflow-x:auto"></div>
     <div id="d-celllist"></div>
 
@@ -507,7 +528,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxc9UKhcFv0WZwVu81JTwM1GK_GOxmwMIcYLZHXsbD0eeBKUSuDeygIdeixZCbpRm-u/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzEhn40UIZJ_DLSIPSx59Z627IE7PG_PMwSks8D5acZcPBxRjkAELJU7kElW7TsQNL9/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -515,11 +536,12 @@ function apiGet(cb, err) {
 }
 function apiPost(payload, cb, err) {
   fetch(EXEC_URL, { method: 'POST', body: JSON.stringify(payload) })
-    .then(function(r){ return r.json(); }).then(cb).catch(err);
+    .then(function(r){ return r.json(); })
+    .then(function(r){ if (r && r.gone) { kickOut_(); return; } cb(r); }).catch(err);
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B30';
+var UI_VERSION = 'B32';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -648,10 +670,221 @@ function paintPeople_() {
 function landing_() {
   if (user && side) go('home'); else if (user) show('view-side'); else show('view-who');
 }
+/* ---- Staff list lockout (B31) ---- */
+/* ---- Home greetings, birthdays and Hennie (B32) ---- */
+var SITE_LL = { 'Cape Town': [-33.9249, 18.4241], 'Workshop': [-33.9249, 18.4241],
+                'Stellenbosch': [-33.9321, 18.8602], 'Franschhoek': [-33.9133, 19.1169] };
+var DAYS_ = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+var MON_ = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var HENNIE_FALLBACK = [
+  ['morning', "Morning! Helmets on, smiles on, and nobody leaves without water."],
+  ['evening', "That's a wrap. Bikes in, shed locked, see you tomorrow."]
+];
+var HADEDA_SVG = '<svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg" aria-label="Hennie">' +
+  '<rect width="56" height="56" fill="#E1F5EE"/>' +
+  '<path d="M33 49 L31 41 M38 49 L37 41" stroke="#B5653A" stroke-width="2" stroke-linecap="round"/>' +
+  '<ellipse cx="35" cy="34" rx="13" ry="8.5" fill="#6E6A5E" transform="rotate(-18 35 34)"/>' +
+  '<path d="M27 32 Q35 26 45 29" stroke="#4F8F7A" stroke-width="2.5" fill="none" stroke-linecap="round"/>' +
+  '<path d="M24 30 Q21 24 21 20" stroke="#6E6A5E" stroke-width="5" fill="none" stroke-linecap="round"/>' +
+  '<circle cx="21" cy="18" r="5.5" fill="#6E6A5E"/>' +
+  '<path d="M16.5 18 Q9 20 6 29" stroke="#2C2A26" stroke-width="2.2" fill="none" stroke-linecap="round"/>' +
+  '<circle cx="21.5" cy="16.5" r="1.4" fill="#fff"/><circle cx="21.8" cy="16.6" r="0.7" fill="#111"/></svg>';
+var greetUntil = 0;
+
+function mmdd_(d) { return ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function firstName_(n) { return String(n || '').split(' ')[0]; }
+function hennieAvatar_() {
+  var pic = DB.hennie && DB.hennie.pic;
+  return '<div class="hav">' + (pic ? '<img src="' + pic + '" alt="Hennie">' : HADEDA_SVG) + '</div>';
+}
+function hennieLine_(tag, salt) {
+  var lines = (DB.hennie && DB.hennie.lines && DB.hennie.lines.length) ? DB.hennie.lines : HENNIE_FALLBACK;
+  var pool = lines.filter(function(l){ return l[0] === tag; });
+  if (!pool.length && tag !== 'evening') pool = lines.filter(function(l){ return l[0] === 'morning'; });
+  if (!pool.length) pool = lines;
+  var s = salt + '|' + new Date().toDateString(), h = 0;
+  for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return pool[Math.abs(h) % pool.length][1];
+}
+function mySite_() {
+  if (side === 'workshop') return 'Workshop';
+  var s = '';
+  try { s = localStorage.getItem('cab_site') || ''; } catch(e) {}
+  return SITE_LL[s] ? s : 'Cape Town';
+}
+function fetchWx_(site, done) {
+  var key = site + '|' + new Date().toDateString();
+  try {
+    var c = JSON.parse(localStorage.getItem('cab_wx') || 'null');
+    if (c && c.key === key) { done(c.wx); return; }
+  } catch(e) {}
+  var ll = SITE_LL[site];
+  if (!ll || typeof fetch === 'undefined') return;
+  fetch('https://api.open-meteo.com/v1/forecast?latitude=' + ll[0] + '&longitude=' + ll[1] +
+        '&daily=temperature_2m_max,precipitation_probability_max,wind_speed_10m_max&timezone=auto&forecast_days=1')
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      var d = j && j.daily;
+      if (!d || !d.temperature_2m_max) return;
+      var wx = { max: Math.round(d.temperature_2m_max[0]), rain: Math.round(d.precipitation_probability_max[0] || 0),
+                 wind: Math.round(d.wind_speed_10m_max[0] || 0) };
+      try { localStorage.setItem('cab_wx', JSON.stringify({ key: key, wx: wx })); } catch(e) {}
+      done(wx);
+    }).catch(function(){});
+}
+function wxTag_(wx) {
+  if (!wx) return 'morning';
+  if (wx.rain >= 50) return 'rain';
+  if (wx.wind >= 35) return 'wind';
+  if (wx.max >= 30) return 'hot';
+  if (wx.max <= 15) return 'cold';
+  return 'morning';
+}
+function wxText_(wx, site) {
+  if (!wx) return '';
+  var place = site === 'Workshop' ? 'Cape Town' : site;
+  var bits = [wx.max + '\u00b0 in ' + place];
+  if (wx.rain >= 50) bits.push(wx.rain + '% chance of rain');
+  else if (wx.wind >= 35) bits.push('windy, gusts to ' + wx.wind + ' km/h');
+  else if (wx.wind >= 20) bits.push('a bit of wind');
+  return '\u2600 ' + bits.join(', ');
+}
+function morningFacts_() {
+  var chips = [];
+  if (side === 'workshop') {
+    var red = (DB.bikes || []).filter(function(b){ return b.inQueue && b.priority === 'Red' && b.active !== 'No'; }).length;
+    var mine = (DB.wtasks || []).filter(function(t){ return t.assignee === user; }).length;
+    chips.push(red ? red + ' red bike' + (red === 1 ? '' : 's') + ' today' : 'No red bikes today');
+    if (mine) chips.push(mine + ' task' + (mine === 1 ? '' : 's') + ' for you');
+  } else {
+    var site = mySite_();
+    var ready = (DB.bikes || []).filter(function(b){ return b.status === 'Available' && b.location === site && b.active !== 'No'; }).length;
+    chips.push(ready + ' bike' + (ready === 1 ? '' : 's') + ' ready at ' + site);
+    var done = false;
+    try { done = String(localStorage.getItem('cab_checklist') || '').indexOf(new Date().toDateString() + '|' + user + '|') === 0; } catch(e) {}
+    if (!done && side !== 'office') chips.push('Checklist before your first tour');
+  }
+  return '<div class="gchips">' + chips.map(function(c){ return '<span>' + c + '</span>'; }).join('') + '</div>';
+}
+function greetHtml_(period) {
+  var key = new Date().toDateString() + '|' + period + '|' + user;
+  var seen = '';
+  try { seen = localStorage.getItem('cab_greet') || ''; } catch(e) {}
+  if (seen !== key) {
+    try { localStorage.setItem('cab_greet', key); } catch(e) {}
+    greetUntil = Date.now() + 300000;
+  }
+  var first = firstName_(user);
+  if (Date.now() > greetUntil) {
+    return '<div class="greet small" onclick="greetUntil=Date.now()+300000;renderGreet_()">' + hennieAvatar_() +
+      '<span><b>' + (period === 'morning' ? 'Morning, ' : 'Wrapping up, ') + first + '</b> \u00b7 tap for Hennie</span></div>';
+  }
+  var head, sub, extra = '';
+  if (period === 'morning') {
+    head = 'Morning, ' + first;
+    sub = '<span id="g-wx"></span>';
+    extra = morningFacts_();
+  } else {
+    head = 'That\u2019s a wrap, ' + first;
+    var tt = (DB.todayTours || {})[user];
+    sub = (tt && (tt.out || tt.back))
+      ? tt.out + ' bike' + (tt.out === 1 ? '' : 's') + ' out, ' + tt.back + ' back in today'
+      : 'Thanks for today';
+    var mine = (DB.onTour || []).filter(function(t){ return t.guide === user; });
+    if (mine.length) {
+      extra = '<div class="gwarn"><span>\u26a0 ' + mine.map(function(t){ return t.assetId; }).join(', ') +
+        ' still out under your name</span><button class="quiet" onclick="go(\'tour\')">Check in</button></div>';
+    }
+  }
+  var line = hennieLine_(period === 'evening' ? 'evening' : 'morning', user + period);
+  return '<div class="greet"><div class="hn">' + hennieAvatar_() + '<div><div class="gh">' + head + '</div>' +
+    '<div class="gs">' + sub + '</div></div></div>' + extra +
+    '<div class="hq"><span id="g-line">\u201c' + line + '\u201d</span><div class="hs">Hennie, Chief Terroir Officer</div></div></div>';
+}
+function birthdayHtml_() {
+  var tk = mmdd_(new Date()), h = '';
+  (DB.people || []).forEach(function(p){
+    if (!p.bday || p.bday !== tk) return;
+    var ch = (DB.cheers || {})[p.name] || [];
+    if (p.name === user) {
+      var who = ch.length <= 4 ? ch.join(', ') : ch.slice(0, 4).join(', ') + ' and ' + (ch.length - 4) + ' others';
+      h += '<div class="bday" style="text-align:center"><div class="bt">\ud83c\udf89 It\u2019s your day, ' + firstName_(p.name) + '!</div>' +
+        '<div class="bs">' + (ch.length ? ch.length + ' from the team cheered you: ' + who : 'Happy birthday from the whole team') + '</div></div>';
+    } else {
+      var done = ch.indexOf(user) !== -1;
+      h += '<div class="bday"><div class="bt">\ud83c\udf82 Happy birthday, ' + p.name + '</div>' +
+        '<div class="bs">Give ' + firstName_(p.name) + ' a shout today</div>' +
+        '<div class="brow"><span>' + ch.length + ' cheer' + (ch.length === 1 ? '' : 's') + ' so far</span>' +
+        (done ? '<span>You cheered \u2713</span>'
+              : '<button class="quiet" onclick="sendCheer_(\'' + jsq_(p.name) + '\')">Send a cheer</button>') +
+        '</div></div>';
+    }
+  });
+  return h;
+}
+function comingUpHtml_() {
+  var now = new Date(), out = [];
+  for (var i = 1; i <= 14; i++) {
+    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i), k = mmdd_(d);
+    (DB.people || []).forEach(function(p){
+      if (p.bday === k) out.push('\ud83c\udf88 ' + p.name + ', ' +
+        (i === 1 ? 'tomorrow' : i < 7 ? DAYS_[d.getDay()] : d.getDate() + ' ' + MON_[d.getMonth()]));
+    });
+  }
+  if (!out.length) return '';
+  return '<div class="soon">Coming up ' + out.map(function(x){ return '<span class="chiplite">' + x + '</span>'; }).join('') + '</div>';
+}
+function renderGreet_() {
+  var el = document.getElementById('home-greet');
+  if (!el) return;
+  if (!user) { el.innerHTML = ''; return; }
+  var hr = new Date().getHours();
+  var period = hr < 12 ? 'morning' : hr >= 16 ? 'evening' : '';
+  el.innerHTML = birthdayHtml_() + (period ? greetHtml_(period) : '') + comingUpHtml_();
+  if (period === 'morning' && document.getElementById('g-wx')) {
+    var site = mySite_();
+    fetchWx_(site, function(wx){
+      var w = document.getElementById('g-wx');
+      if (w) w.innerHTML = wxText_(wx, site);
+      var q = document.getElementById('g-line');
+      if (q) q.textContent = '\u201c' + hennieLine_(wxTag_(wx), user + 'morning') + '\u201d';
+    });
+  }
+}
+function sendCheer_(name) {
+  var c = (DB.cheers = DB.cheers || {});
+  c[name] = c[name] || [];
+  if (c[name].indexOf(user) === -1) c[name].push(user);
+  renderGreet_();
+  toast('Cheer sent to ' + name);
+  CHEER_CALL(name, function(r){ if (r && r.error) toast(r.error, true); },
+             function(){ toast('Cheer not sent \u2014 check signal', true); });
+}
+
+function kickOut_() {
+  var who = user;
+  user = ''; role = 'guide'; pin = '';
+  try {
+    localStorage.removeItem('cab_user'); localStorage.removeItem('cab_role'); localStorage.removeItem('cab_pin');
+  } catch(e) {}
+  try { stopScanner(); } catch(e) {}
+  var w = document.getElementById('whoami'); if (w) w.innerHTML = '';
+  show('view-who');
+  toast((who ? who + ' is ' : 'You are ') + 'no longer on the staff list', true);
+}
+function staffCheck_() {
+  if (!user) return false;
+  var on = (DB.people || []).some(function(p){ return String(p.name || p).trim() === user; });
+  if (on) return false;
+  kickOut_();
+  return true;
+}
+
 function gotFresh_(d, hadCache) {
   DB = d;
   try { localStorage.setItem('cab_db', JSON.stringify(d)); } catch(e) {}
   paintPeople_();
+  if (staffCheck_()) return;
   if (!hadCache) { landing_(); return; }
   repaintVisible_();
 }
@@ -684,6 +917,7 @@ function go(view) {
     if (!side) { show('view-side'); return; }
     paintSide_();
     paintRoles_();
+    renderGreet_();
     show('view-home');
   } else if (view === 'dash') {
     renderDash();
@@ -1400,9 +1634,10 @@ function saveMove() {
 
 /* ---------- ops dashboard ---------- */
 var SITES = [
-  { name: 'Workshop', label: 'Warehouse', type: 'HOLDING' },
-  { name: 'Stellenbosch', type: 'TOUR' },
-  { name: 'Franschhoek', type: 'TOUR' }
+  { name: 'Workshop', type: 'HOLDING' },
+  { name: 'Cape Town', type: 'HOLDING' },
+  { name: 'Stellenbosch', type: 'SELLING' },
+  { name: 'Franschhoek', type: 'SELLING' }
 ];
 var dashFilter = 'All';
 var STATUS_COLORS = { 'Available':'#1B7A3D', 'On tour':'#1D5FBF', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Pending':'#6E4A9E', 'Out of Service':'#D2141B', 'Retired':'#555555', 'Other':'#888888' };
@@ -1445,11 +1680,11 @@ function renderDash() {
   var ready = counts['Available'] || 0;
   var pct = total ? Math.round(ready / total * 100) : 0;
   var atHub = bikes.filter(function(b){
-    return b.status === 'Available' && b.location === 'Workshop';
+    return b.status === 'Available' && (b.location === 'Workshop' || b.location === 'Cape Town');
   }).length;
   document.getElementById('d-pct').textContent = pct + '%';
   document.getElementById('d-ready-sub').innerHTML =
-    ready + ' of ' + total + ' bikes' + (atHub ? '<br>' + atHub + ' ready but sitting at the warehouse' : '');
+    ready + ' of ' + total + ' bikes' + (atHub ? '<br>' + atHub + ' ready but sitting at a hub' : '');
   var bar = '', leg = '';
   DB.statuses.forEach(function(st){
     var n = counts[st] || 0;
@@ -1487,49 +1722,46 @@ function renderDash() {
   function cellBikes(size, site) {
     return pool.filter(function(b){ return bucketSize_(b) === size && b.location === site; });
   }
-  var html = '<p class="note" style="margin-top:4px"><b>Showing: ' +
-    (dashFilter === 'All' ? 'all active bikes' : dashFilter) + '</b></p>';
-  html += '<table class="dash"><tr><th>Size</th>';
-  SITES.forEach(function(s){ html += '<th>' + (s.label || s.name) + '<small>' + s.type + '</small></th>'; });
-  html += '<th>Ready</th><th>Not ready</th><th>Total</th></tr>';
-  var colReady = {}, colAll = {}, gReady = 0, gAll = 0;
+  var html = '<table class="dash"><tr><th>Size</th>';
+  SITES.forEach(function(s){ html += '<th>' + s.name + '<small>' + s.type + '</small></th>'; });
+  html += '<th>Total</th></tr>';
+  var readyCol = {};
   sizes.forEach(function(size){
-    var rReady = 0, rAll = 0, cells = '';
+    var rowTotal = 0;
+    var cells = '';
     SITES.forEach(function(site){
       var here = cellBikes(size, site.name);
       var r = here.filter(function(b){ return b.status === 'Available'; }).length;
-      rReady += r; rAll += here.length;
-      colReady[site.name] = (colReady[site.name] || 0) + r;
-      colAll[site.name] = (colAll[site.name] || 0) + here.length;
+      var down = here.length - r;
+      rowTotal += here.length;
+      readyCol[site.name] = (readyCol[site.name] || 0) + r;
       var cls = '';
-      if (site.type === 'TOUR') { if (r === 0) cls = 'bad'; else if (r === 1) cls = 'warn'; }
-      cells += '<td class="' + cls + '" onclick="showCell(\'' + size.replace(/'/g,"\\'") + '\',\'' + site.name + '\')">' +
-               (here.length ? '<b>' + r + '</b> / ' + here.length : '&ndash;') + '</td>';
+      if (site.type === 'SELLING') {
+        if (r === 0) cls = 'bad'; else if (r === 1) cls = 'warn';
+      }
+      cells += '<td class="' + cls + '" onclick="showCell(\'' + size.replace(/'/g,"\\'") + '\',\'' + site.name + '\')">' + r +
+               (down ? '<span class="down">' + down + ' down</span>' : '') + '</td>';
     });
-    gReady += rReady; gAll += rAll;
-    html += '<tr><td>' + size + '</td>' + cells +
-            '<td><b>' + rReady + '</b></td><td>' + (rAll - rReady) + '</td><td>' + rAll + '</td></tr>';
+    html += '<tr><td>' + size + '</td>' + cells + '<td><b>' + rowTotal + '</b></td></tr>';
   });
-  html += '<tr class="total"><td>ALL</td>';
-  SITES.forEach(function(s){ html += '<td>' + (colReady[s.name] || 0) + ' / ' + (colAll[s.name] || 0) + '</td>'; });
-  html += '<td>' + gReady + '</td><td>' + (gAll - gReady) + '</td><td>' + gAll + '</td></tr></table>';
-  var outside = pool.length - gAll;
-  if (outside > 0) html += '<p class="note">+ ' + outside + ' bike' + (outside === 1 ? '' : 's') +
-    ' not at the warehouse, Stellenbosch or Franschhoek (in transit, no location or elsewhere) &mdash; not counted above.</p>';
+  html += '<tr class="total"><td>READY</td>';
+  var readyShown = 0;
+  SITES.forEach(function(s){ var n = readyCol[s.name] || 0; readyShown += n; html += '<td>' + n + '</td>'; });
+  html += '<td>' + readyShown + '</td></tr></table>';
   document.getElementById('d-matrix').innerHTML = html;
   document.getElementById('d-celllist').innerHTML = '';
 
-  /* gaps: tour site with no ready stock while another site has 2+ */
+  /* gaps: selling site with no ready stock while another site has 2+ */
   var gaps = '';
   sizes.forEach(function(size){
-    SITES.filter(function(s){ return s.type === 'TOUR'; }).forEach(function(sell){
+    SITES.filter(function(s){ return s.type === 'SELLING'; }).forEach(function(sell){
       var here = cellBikes(size, sell.name).filter(function(b){ return b.status === 'Available'; }).length;
       if (here !== 0) return;
       var best = null;
       SITES.forEach(function(src){
         if (src.name === sell.name) return;
         var n = cellBikes(size, src.name).filter(function(b){ return b.status === 'Available'; }).length;
-        if (n >= 2 && (!best || n > best.n)) best = { name: src.label || src.name, n: n };
+        if (n >= 2 && (!best || n > best.n)) best = { name: src.name, n: n };
       });
       if (best) {
         var cat = dashFilter === 'All' ? '' : ' ' + dashFilter;
@@ -1823,13 +2055,14 @@ function BMOVE_CALL(code, ok, err) { apiPost({ action: 'move', barcode: code, ne
 function WTADD_CALL(p, ok, err) { p.action = 'wtaskadd'; p.pin = pin; apiPost(p, ok, err); }
 function WTDONE_CALL(rows, ok, err) { apiPost({ action: 'wtasksdone', rows: rows, user: user, pin: pin }, ok, err); }
 function FIXED_CALL(assets, ok, err) { apiPost({ action: 'bikesfixed', assets: assets, user: user, pin: pin }, ok, err); }
+function CHEER_CALL(name, ok, err) { apiPost({ action: 'cheer', forName: name, user: user }, ok, err); }
 function PRIO_CALL(p, ok, err) { apiPost({ action: 'setprio', assetId: p.assetId, prio: p.prio, user: user, pin: pin }, ok, err); }
 function TPRIO_CALL(p, ok, err) { apiPost({ action: 'taskprio', row: p.row, prio: p.prio, user: user, pin: pin }, ok, err); }
 function GTASK_CALL(p, ok, err) { p.action = 'gtask'; p.pin = pin; apiPost(p, ok, err); }
 function ORDER_CALL(o, ok, err) { apiPost({ action: 'orderpart', part: o.part, qty: o.qty, priority: o.priority, brand: o.brand, notes: o.notes, user: user, pin: pin, photo: o.photo || '', photoType: 'image/jpeg' }, ok, err); }
 function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, user: user, pin: pin }, ok, err); }
 function PARTSDONE_CALL(rows, ok, err) { apiPost({ action: 'partsdone', rows: rows, user: user, pin: pin }, ok, err); }
-function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (done) done(); }, function(){}); }
+function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (staffCheck_()) return; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
 
 /* ---------- tour hub ---------- */
@@ -1868,6 +2101,7 @@ function renderTourLoc_() {
     b.textContent = l;
     b.onclick = function(){
       tourLoc = l;
+      try { localStorage.setItem('cab_site', l); } catch(e) {}
       Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
       b.classList.add('on');
     };
