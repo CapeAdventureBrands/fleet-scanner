@@ -166,6 +166,26 @@
   .pill.gb { background:#E1F5EE; color:#0F6E56; }
   #gb-box { margin-top:10px; padding:10px 12px; background:#E1F5EE; border:1px solid #0F6E56; }
   #gb-box .pq { font-size:13px; font-weight:700; margin:0 0 4px; }
+  /* B37: fun animations */
+  .greet:not(.small) .hav .hh-bird, .greet:not(.small) .hav img { animation: hhHop .7s ease-out both; transform-box: fill-box; transform-origin: 50% 100%; }
+  .greet:not(.small) .hav .hh-wing { animation: hhFlap .22s ease-in-out .7s 6 alternate; transform-box: fill-box; transform-origin: 15% 85%; }
+  .greet .hav .hh-head { animation: hhTilt 7s ease-in-out 1.6s infinite; transform-box: fill-box; transform-origin: 75% 95%; }
+  .greet .hav img { animation-name: hhHop, hhBob; animation-duration: .7s, 4s; animation-delay: 0s, 1s; animation-iteration-count: 1, infinite; }
+  @keyframes hhHop { 0% { transform: translateY(16px) scale(.6); opacity: 0; } 60% { transform: translateY(-5px) scale(1.06); opacity: 1; } 100% { transform: none; } }
+  @keyframes hhFlap { from { transform: rotate(0deg); } to { transform: rotate(-30deg); } }
+  @keyframes hhTilt { 0%, 84%, 100% { transform: rotate(0deg); } 89% { transform: rotate(-16deg); } 94% { transform: rotate(7deg); } }
+  @keyframes hhBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+  .hol { position: relative; overflow: hidden; }
+  .hol::after { content: ''; position: absolute; top: 0; left: -60%; width: 45%; height: 100%; pointer-events: none;
+    background: linear-gradient(100deg, rgba(255,255,255,0), rgba(255,255,255,.6), rgba(255,255,255,0)); animation: holShine 6s ease-in-out 1s infinite; }
+  @keyframes holShine { 0% { left: -60%; } 28%, 100% { left: 130%; } }
+  .confetti { position: fixed; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; z-index: 9999; }
+  .confetti i { position: absolute; top: -14px; width: 8px; height: 12px; animation: cfFall 1.4s ease-in forwards; }
+  @keyframes cfFall { to { transform: translate(var(--dx), 108vh) rotate(560deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .greet .hav *, .greet .hav img, .hol::after, .confetti i { animation: none !important; }
+    .hol::after, .confetti { display: none; }
+  }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -563,7 +583,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwI909VG1QLhdyTZJGK_NF9ysCq6Fzm4oJQjXlnpPYuPGXIM7QfyPJyoLyxuhw8tteC/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwNv_0kXtOLDeQTtGZ_gSdssyRPdOZuyivjhZB6qX5R9KPLrPU5IAVfasTYyxYvIGvo/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -576,7 +596,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B36';
+var UI_VERSION = 'B37';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -717,13 +737,16 @@ var HENNIE_FALLBACK = [
 ];
 var HADEDA_SVG = '<svg viewBox="0 0 56 56" xmlns="http://www.w3.org/2000/svg" aria-label="Hennie">' +
   '<rect width="56" height="56" fill="#E1F5EE"/>' +
+  '<g class="hh-bird">' +
   '<path d="M33 49 L31 41 M38 49 L37 41" stroke="#B5653A" stroke-width="2" stroke-linecap="round"/>' +
   '<ellipse cx="35" cy="34" rx="13" ry="8.5" fill="#6E6A5E" transform="rotate(-18 35 34)"/>' +
-  '<path d="M27 32 Q35 26 45 29" stroke="#4F8F7A" stroke-width="2.5" fill="none" stroke-linecap="round"/>' +
+  '<g class="hh-wing"><path d="M27 32 Q35 26 45 29" stroke="#4F8F7A" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>' +
+  '<g class="hh-head">' +
   '<path d="M24 30 Q21 24 21 20" stroke="#6E6A5E" stroke-width="5" fill="none" stroke-linecap="round"/>' +
   '<circle cx="21" cy="18" r="5.5" fill="#6E6A5E"/>' +
   '<path d="M16.5 18 Q9 20 6 29" stroke="#2C2A26" stroke-width="2.2" fill="none" stroke-linecap="round"/>' +
-  '<circle cx="21.5" cy="16.5" r="1.4" fill="#fff"/><circle cx="21.8" cy="16.6" r="0.7" fill="#111"/></svg>';
+  '<circle cx="21.5" cy="16.5" r="1.4" fill="#fff"/><circle cx="21.8" cy="16.6" r="0.7" fill="#111"/>' +
+  '</g></g></svg>';
 var greetUntil = 0;
 
 function mmdd_(d) { return ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -1071,6 +1094,46 @@ function saveMove() {
   }, function(){ toast('Save failed \u2014 check signal', true); });
 }
 
+/* ---- Fun animations (B37) ---- */
+function confetti_(n) {
+  try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch(e) {}
+  if (!document.body || !document.createElement) return;
+  var box = document.createElement('div');
+  box.className = 'confetti';
+  var cols = ['#D2141B', '#F0A21A', '#1B7A2D', '#1D5FBF', '#D4537E', '#6E4A9E'];
+  for (var i = 0; i < (n || 45); i++) {
+    var p = document.createElement('i');
+    p.style.left = (Math.random() * 100) + '%';
+    p.style.background = cols[i % cols.length];
+    p.style.animationDelay = (Math.random() * 0.35).toFixed(2) + 's';
+    p.style.animationDuration = (1.1 + Math.random() * 0.8).toFixed(2) + 's';
+    if (p.style.setProperty) p.style.setProperty('--dx', Math.round(Math.random() * 140 - 70) + 'px');
+    if (i % 3 === 0) p.style.borderRadius = '50%';
+    box.appendChild(p);
+  }
+  document.body.appendChild(box);
+  setTimeout(function(){ if (box.parentNode) box.parentNode.removeChild(box); }, 2600);
+}
+function birthdayFx_() {
+  var tk = mmdd_(new Date());
+  var mine = (DB.people || []).some(function(p){ return p.name === user && p.bday === tk; });
+  if (!mine) return;
+  var key = new Date().toDateString() + '|' + user, seen = '';
+  try { seen = localStorage.getItem('cab_bdayfx') || ''; } catch(e) {}
+  if (seen === key) return;
+  try { localStorage.setItem('cab_bdayfx', key); } catch(e) {}
+  confetti_(80);
+}
+function guidesAllHome_(guides) {
+  return guides.filter(function(g){ return g && !(DB.onTour || []).some(function(t){ return t.guide === g; }); });
+}
+function celebrateHome_(guides) {
+  if (!guides.length) return false;
+  confetti_(55);
+  toast('Every bike home \u2014 nice work, ' + guides.map(firstName_).join(' & ') + '! \ud83c\udf89');
+  return true;
+}
+
 function renderGreet_() {
   var el = document.getElementById('home-greet');
   if (!el) return;
@@ -1080,6 +1143,7 @@ function renderGreet_() {
   var period = (sp && !sp.open) ? '' : hr < 12 ? 'morning' : hr >= GOODBYE_HOUR ? 'evening' : '';
   el.innerHTML = specialHtml_(sp) + birthdayHtml_() + (period ? greetHtml_(period) : '') +
                  (period === 'evening' ? closedTomorrowHtml_() : '') + comingUpHtml_();
+  birthdayFx_();
   if (period === 'morning' && document.getElementById('g-wx')) {
     var site = mySite_();
     fetchWx_(site, function(wx){
@@ -1095,6 +1159,7 @@ function sendCheer_(name) {
   c[name] = c[name] || [];
   if (c[name].indexOf(user) === -1) c[name].push(user);
   renderGreet_();
+  confetti_(40);
   toast('Cheer sent to ' + name);
   CHEER_CALL(name, function(r){ if (r && r.error) toast(r.error, true); },
              function(){ toast('Cheer not sent \u2014 check signal', true); });
@@ -1630,12 +1695,15 @@ function saveTourIn_() {
   btn.disabled = true; btn.textContent = 'Checking in\u2026';
   TOURRET_CALL({ assets: assets, user: user, location: tourLoc }, function(r){
     if (!r || r.error) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); tourInChanged_(); return; }
+    var homeG = [];
+    (DB.onTour || []).forEach(function(t){ if (assets.indexOf(t.assetId) !== -1 && homeG.indexOf(t.guide) === -1) homeG.push(t.guide); });
     DB.onTour = (DB.onTour || []).filter(function(t){ return assets.indexOf(t.assetId) === -1; });
+    homeG = guidesAllHome_(homeG);
     (DB.bikes || []).forEach(function(b){
       if (assets.indexOf(b.assetId) !== -1) { b.status = 'Available'; b.location = tourLoc; }
     });
     try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
-    toast(r.count + ' bike' + (r.count === 1 ? '' : 's') + ' back in at ' + tourLoc);
+    if (!celebrateHome_(homeG)) toast(r.count + ' bike' + (r.count === 1 ? '' : 's') + ' back in at ' + tourLoc);
     go('tour');
   }, function(){ toast('Save failed \u2014 check signal', true); tourInChanged_(); });
 }
@@ -1672,6 +1740,8 @@ function onCode(code) {
       }
       if (r.blocked) { toast(r.assetId + ' is ' + (STATUS_LABELS[r.status] || r.status) + ' \u2014 not tour-ready', true); goTour_(); return; }
       if (r.already) { toast(r.assetId + ' is already out', true); goTour_(); return; }
+      var wasOut = null;
+      (DB.onTour || []).some(function(t){ if (t.assetId === r.assetId) { wasOut = t; return true; } });
       DB.onTour = (DB.onTour || []).filter(function(t){ return t.assetId !== r.assetId; });
       if (dir === 'out') DB.onTour.push({ assetId: r.assetId, guide: user, when: new Date().toISOString(), location: tourLoc,
         dueBack: tourLoc === MULTI ? multiBack : '', note: tourLoc === MULTI ? (document.getElementById('t-mname').value || '').trim() : '' });
@@ -1684,7 +1754,8 @@ function onCode(code) {
       });
       try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
       tourSession.push(r.assetId);
-      toast(r.assetId + (dir === 'out' ? ' \u2014 out at ' + tourLoc + ' (' + tourSession.length + ')' : ' \u2014 back in at ' + tourLoc));
+      if (!(dir === 'in' && wasOut && celebrateHome_(guidesAllHome_([wasOut.guide]))))
+        toast(r.assetId + (dir === 'out' ? ' \u2014 out at ' + tourLoc + ' (' + tourSession.length + ')' : ' \u2014 back in at ' + tourLoc));
       goTour_();            // straight back to the scanner \u2014 next bike
     }, function(){ toast('Save failed \u2014 check signal', true); goTour_(); });
   } else if (mode === 'move-scan') {
