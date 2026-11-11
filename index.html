@@ -150,6 +150,22 @@
   .bday .brow button { width:auto; padding:6px 12px; margin:0; }
   .soon { font-size:12px; margin:-4px 0 12px; color:var(--grey); }
   .soon .chiplite { display:inline-block; padding:4px 10px; border:1px solid var(--line); margin:4px 6px 0 0; color:var(--black); }
+  .hol { background:#FAEEDA; border:2px solid #BA7517; padding:14px; margin-bottom:12px; color:#633806; }
+  .hol .ht { font-family:'Montserrat',sans-serif; font-weight:800; font-size:17px; }
+  .hol .hs2 { font-size:13px; margin-top:4px; line-height:1.5; }
+  .hol.hol-closed { background:#F1EFE8; border-color:#888780; color:#2C2C2A; }
+  .holwarn { background:#FAEEDA; color:#633806; padding:10px 12px; margin:-4px 0 12px; font-size:13px; line-height:1.5; }
+  #pend-box { margin-top:10px; padding:10px 12px; background:#F3EEF9; border:1px solid #6E4A9E; }
+  #pend-box .pq { font-size:13px; font-weight:700; margin:0 0 4px; }
+  #pend-box input[type=date] { margin-top:8px; }
+  .legtap { cursor:pointer; border-bottom:1px dotted var(--grey); }
+  .legtap.on { color:var(--black); border-bottom:2px solid var(--black); }
+  #d-statlist { margin-top:12px; }
+  #d-statlist .sl-head { display:flex; justify-content:space-between; align-items:center; font-family:'Montserrat',sans-serif; font-weight:800; font-size:14px; margin-bottom:4px; }
+  #d-statlist .sl-head a { font-family:inherit; font-weight:400; font-size:12px; color:var(--grey); cursor:pointer; text-decoration:underline; }
+  .pill.gb { background:#E1F5EE; color:#0F6E56; }
+  #gb-box { margin-top:10px; padding:10px 12px; background:#E1F5EE; border:1px solid #0F6E56; }
+  #gb-box .pq { font-size:13px; font-weight:700; margin:0 0 4px; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -300,6 +316,7 @@
       <div class="ready-line"><span class="ready-pct" id="d-pct"></span><span class="ready-sub" id="d-ready-sub"></span></div>
       <div class="stackbar" id="d-bar"></div>
       <div class="legend" id="d-legend"></div>
+      <div id="d-statlist"></div>
     </div>
 
     <h2>What&rsquo;s where, by size</h2>
@@ -419,7 +436,7 @@
   <section id="view-wq" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
     <h2>Bikes needing attention</h2>
-    <p class="note">What to pick up next. Tap a bike to open its job card and log the work \u2014 or tick it when it&rsquo;s sorted and clear several at once.</p>
+    <p class="note">What to pick up next. Tap a bike to open its job card and log the work &mdash; or tick it when it&rsquo;s sorted and clear several at once.</p>
     <div id="wq-list"></div>
     <button class="primary" style="width:100%;margin-top:12px;display:none" id="wq-done" onclick="saveWqFixed_()" disabled>Tick bikes when they&rsquo;re sorted</button>
   </section>
@@ -524,6 +541,18 @@
     <div class="chips" id="locs"></div>
     <h2>Set status</h2>
     <div class="chips" id="stats"></div>
+    <div id="pend-box" style="display:none">
+      <p class="pq">Can it still be ridden?</p>
+      <div class="chips" id="pend-ride"></div>
+      <p class="note" id="pend-lock" style="display:none;color:var(--red);margin:4px 0 0">Brakes or steering fault reported &mdash; it can&rsquo;t be marked rideable.</p>
+      <p class="pq" style="margin-top:10px">Ready by</p>
+      <div class="chips" id="pend-by"></div>
+      <input type="date" id="pend-date" onchange="current.pendBy=this.value;paintPend_();updateSave()">
+    </div>
+    <div id="gb-box" style="display:none">
+      <p class="pq">Which guide has it?</p>
+      <div class="chips" id="gb-who"></div>
+    </div>
     <div class="bar">
       <button class="quiet" onclick="go('lookup')">Cancel</button>
       <button class="primary" id="save" onclick="saveMove()" disabled>Save changes</button>
@@ -534,7 +563,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzGTMwHKMIwWBVzriM1EIS6WApj7P2fvxdvUX1iYn5zohBuwFflfmvqcn89lx3iqUpL/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwI909VG1QLhdyTZJGK_NF9ysCq6Fzm4oJQjXlnpPYuPGXIM7QfyPJyoLyxuhw8tteC/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -547,7 +576,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B33';
+var UI_VERSION = 'B36';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -831,22 +860,226 @@ function birthdayHtml_() {
 function comingUpHtml_() {
   var now = new Date(), out = [];
   for (var i = 1; i <= 14; i++) {
-    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i), k = mmdd_(d);
+    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i), k = mmdd_(d), w = whenLabel_(d, i);
+    var sp = specialOn_(isoDay_(d));
+    if (sp) out.push((sp.open ? '\ud83c\udf89 ' : '\ud83d\udd12 ') + sp.name + ', ' + w + (sp.open ? '' : ' (closed)'));
     (DB.people || []).forEach(function(p){
-      if (p.bday === k) out.push('\ud83c\udf88 ' + p.name + ', ' +
-        (i === 1 ? 'tomorrow' : i < 7 ? DAYS_[d.getDay()] : d.getDate() + ' ' + MON_[d.getMonth()]));
+      if (p.bday === k) out.push('\ud83c\udf88 ' + p.name + ', ' + w);
     });
   }
   if (!out.length) return '';
   return '<div class="soon">Coming up ' + out.map(function(x){ return '<span class="chiplite">' + x + '</span>'; }).join('') + '</div>';
 }
+/* ---- Special days (B34) ---- */
+var GOODBYE_HOUR = 15;
+function specialOn_(iso) {
+  var hit = null;
+  (DB.specialDays || []).some(function(x){ if (x.date === iso) { hit = x; return true; } });
+  return hit;
+}
+function holTitle_(n) {
+  if (/christmas/i.test(n)) return 'Merry Christmas';
+  if (/easter/i.test(n)) return 'Happy Easter';
+  if (/^(happy|merry|public holiday)/i.test(n) || /good friday/i.test(n)) return n;
+  return 'Happy ' + n;
+}
+function whenLabel_(d, i) {
+  return i === 1 ? 'tomorrow' : i < 7 ? DAYS_[d.getDay()] : d.getDate() + ' ' + MON_[d.getMonth()];
+}
+function specialHtml_(sp) {
+  if (!sp) return '';
+  var hennie = sp.line ? ' \u201c' + sp.line + '\u201d \u2014 Hennie' : '';
+  if (!sp.open) {
+    return '<div class="hol hol-closed"><div class="ht">' + holTitle_(sp.name) + '</div>' +
+      '<div class="hs2">We\u2019re closed today. Enjoy the day.' + hennie + '</div></div>';
+  }
+  return '<div class="hol"><div class="ht">\ud83c\udf89 ' + holTitle_(sp.name) + '</div>' +
+    '<div class="hs2">Public holiday \u2014 expect holiday crowds, more locals and kids.' + hennie + '</div></div>';
+}
+function closedTomorrowHtml_() {
+  var now = new Date();
+  var t1 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  var sp = specialOn_(isoDay_(t1));
+  if (!sp || sp.open) return '';
+  var i = 1, d = t1;
+  while (i < 10) {
+    var c = specialOn_(isoDay_(d));
+    if (!c || c.open) break;
+    i++;
+    d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+  }
+  return '<div class="holwarn">\ud83d\udd12 <b>Tomorrow\u2019s ' + sp.name + ' \u2014 we\u2019re closed.</b> ' +
+    'Every bike scanned in, shed locked. See you ' + (i === 1 ? 'tomorrow' : whenLabel_(d, i)) + '.</div>';
+}
+/* ---- Pending check: rideable + ready by (B35) ---- */
+var RIDE_LOCK_RE = /brake|steer|headset/i;
+var tourConfirm = '';
+var dashStat = '';
+function pendTag_(b) {
+  if (!b || b.status !== 'Pending') return '';
+  var ride = b.pendRide === 'Yes' ? '\ud83d\udfe2 Rideable' : b.pendRide === 'No' ? '\ud83d\udd34 Don\u2019t ride' : '\u26aa Rideable? not set';
+  var by = !b.pendBy ? 'ready by: not set'
+    : b.pendBy < isoDay_(new Date()) ? '<b style="color:var(--red)">was due ' + niceDay_(b.pendBy) + '</b>'
+    : 'ready by <b>' + niceDay_(b.pendBy) + '</b>';
+  return '<div class="meta">' + ride + ' \u00b7 ' + by + '</div>';
+}
+function pendChips_(id, opts, val, onPick) {
+  var el = document.getElementById(id);
+  el.innerHTML = '';
+  opts.forEach(function(o){
+    var c = document.createElement('button');
+    c.className = 'chip' + (o[0] === val ? ' on' : '');
+    c.textContent = o[1];
+    c.onclick = function(){ onPick(o[0]); };
+    el.appendChild(c);
+  });
+}
+function paintPend_() {
+  var box = document.getElementById('pend-box');
+  if (!box || !current.bike) return;
+  var st = current.newStatus || current.bike.status;
+  if (st !== 'Pending') { box.style.display = 'none'; return; }
+  box.style.display = '';
+  var locked = !!current.bike.pendLocked ||
+    (current.faults || []).some(function(f){ return RIDE_LOCK_RE.test(f && f.fault ? f.fault : String(f || '')); });
+  if (locked) current.pendRide = 'No';
+  document.getElementById('pend-lock').style.display = locked ? '' : 'none';
+  pendChips_('pend-ride', locked ? [['No', 'No, don\u2019t ride']] : [['Yes', 'Yes, ride with care'], ['No', 'No, don\u2019t ride']],
+    current.pendRide, function(v){ current.pendRide = v; paintPend_(); updateSave(); });
+  var now = new Date(), d = function(n){ return isoDay_(new Date(now.getFullYear(), now.getMonth(), now.getDate() + n)); };
+  pendChips_('pend-by', [[d(1), 'Tomorrow'], [d(2), 'In 2 days'], [d(3), 'In 3 days'], [d(7), 'In a week'], ['', 'Don\u2019t know']],
+    current.pendBy || '', function(v){ current.pendBy = v; paintPend_(); updateSave(); });
+  document.getElementById('pend-date').value = current.pendBy || '';
+}
+
+
+function showStat_(st) {
+  dashStat = dashStat === st ? '' : st;
+  renderDash();
+}
+function paintStat_() {
+  var el = document.getElementById('d-statlist');
+  if (!el) return;
+  Array.prototype.forEach.call(document.querySelectorAll('#d-legend .legtap'), function(x){
+    x.classList[x.getAttribute('data-st') === dashStat ? 'add' : 'remove']('on');
+  });
+  if (!dashStat) { el.innerHTML = ''; return; }
+  var tours = {};
+  (DB.onTour || []).forEach(function(t){ tours[t.assetId] = t; });
+  var list = activeBikes_().filter(function(b){ return b.status === dashStat; });
+  list.sort(function(a, c){
+    if (dashStat === 'Pending') {
+      var pa = a.pendBy || '9999', pc = c.pendBy || '9999';
+      if (pa !== pc) return pa < pc ? -1 : 1;
+    }
+    return tms_(a.statusChanged) - tms_(c.statusChanged);
+  });
+  var h = '<div class="sl-head"><span>' + (STATUS_LABELS[dashStat] || dashStat) + ' (' + list.length + ')</span>' +
+          '<a onclick="showStat_(\'' + dashStat + '\')">close</a></div>';
+  list.forEach(function(b){
+    var code = b.barcode || b.assetId;
+    var days = openDays_(b.statusChanged).replace('open ', '').replace('logged today', 'today');
+    var lead = dashStat === 'Pending' ? 'pending ' : dashStat === 'On tour' ? 'out ' : '';
+    var tt = tours[b.assetId];
+    h += '<div class="move" style="cursor:pointer" onclick="openBikeByBarcode(\'' + jsq_(code) + '\', \'dash\')"><b>' + b.assetId + '</b>' +
+      ' \u00b7 ' + (b.location || '?') + (days ? ' \u00b7 ' + lead + days : '') +
+      (tt ? ' \u00b7 ' + tt.guide + (tt.dueBack ? ' \u00b7 ' + multiLabel_(tt) : '') : '') +
+      faultLine_(b.assetId) + pendTag_(b) + guideTag_(b) + '</div>';
+  });
+  if (!list.length) h += '<p class="note">None right now.</p>';
+  el.innerHTML = h;
+}
+
+/* ---- Guide bikes (B36) ---- */
+var GUIDE_OUT = { v:'Guide bike', label:'Guide bike', cls:'gb' };
+function guideTag_(b) {
+  if (!b || b.status !== 'Guide bike') return '';
+  var who = !b.guideHolder ? '<b style="color:var(--red)">no guide recorded</b>'
+    : b.guideGone ? '<b style="color:var(--red)">held by ' + b.guideHolder + ' (no longer on staff)</b>'
+    : 'with <b>' + b.guideHolder + '</b>';
+  return '<div class="meta">\ud83d\udeb2 ' + who + (b.guideSince ? ' since ' + niceDay_(b.guideSince) : '') +
+    (b.serviceDue ? ' \u00b7 <b style="color:var(--red)">service due</b>' : '') + '</div>';
+}
+function paintGb_() {
+  var box = document.getElementById('gb-box');
+  if (!box || !current.bike) return;
+  var b = current.bike, st = current.newStatus || b.status;
+  if (b.status === 'Guide bike' && b.guideHolder) {
+    document.getElementById('b-status').textContent = 'Guide bike \u00b7 ' + b.guideHolder;
+  }
+  if (st !== 'Guide bike') { box.style.display = 'none'; return; }
+  box.style.display = '';
+  pendChips_('gb-who', (DB.people || []).map(function(p){ return [p.name, p.name]; }), current.gbWho || '',
+    function(v){ current.gbWho = v; paintGb_(); updateSave(); });
+}
+function labelledStatusChips_(id, currentVal, onPick) {
+  var el = document.getElementById(id);
+  el.innerHTML = '';
+  OUTCOMES.concat([GUIDE_OUT]).forEach(function(o){
+    var b = document.createElement('button');
+    b.className = 'chip' + (o.v === currentVal ? ' on' : '');
+    b.textContent = o.label;
+    b.onclick = function(){
+      Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
+      b.classList.add('on');
+      onPick(o.v);
+    };
+    el.appendChild(b);
+  });
+}
+function updateSave() {
+  var b = current.bike;
+  var st = current.newStatus || b.status;
+  var pendChanged = st === 'Pending' &&
+    ((current.pendRide || '') !== (b.pendRide || '') || (current.pendBy || '') !== (b.pendBy || ''));
+  var gbChanged = st === 'Guide bike' && (current.gbWho || '') !== (b.guideHolder || '');
+  var changed = (current.newLoc && current.newLoc !== b.location) ||
+                (current.newStatus && current.newStatus !== b.status) || pendChanged || gbChanged;
+  if (st === 'Guide bike' && !current.gbWho) changed = false;   // must say who has it
+  document.getElementById('save').disabled = !changed;
+}
+function saveMove() {
+  var b = current.bike;
+  var moved = (current.newLoc && current.newLoc !== b.location) || (current.newStatus && current.newStatus !== b.status);
+  var st = current.newStatus || b.status;
+  function after_(msg) {
+    if (st === 'Pending') {
+      PEND_CALL({ assetId: b.assetId, rideable: current.pendRide || '', readyBy: current.pendBy || '' }, function(r){
+        if (r && r.error) { toast(r.error, true); return; }
+        b.pendRide = (r && r.rideable !== undefined) ? r.rideable : current.pendRide;
+        b.pendBy = current.pendBy || '';
+        toast(msg + (b.pendRide === 'Yes' ? ' \u00b7 rideable' : b.pendRide === 'No' ? ' \u00b7 don\u2019t ride' : '') +
+              (b.pendBy ? ' \u00b7 ready by ' + niceDay_(b.pendBy) : ''));
+        go('lookup');
+      }, function(){ toast('Status saved, but rideable / ready-by didn\u2019t \u2014 check signal', true); go('lookup'); });
+    } else if (st === 'Guide bike') {
+      GB_CALL({ assetId: b.assetId, guide: current.gbWho || '' }, function(r){
+        if (r && r.error) { toast(r.error, true); return; }
+        b.guideHolder = current.gbWho; b.guideGone = false;
+        if (r && r.since) b.guideSince = r.since;
+        toast(msg + ' \u00b7 with ' + current.gbWho);
+        go('lookup');
+      }, function(){ toast('Status saved, but the guide didn\u2019t \u2014 check signal', true); go('lookup'); });
+    } else { toast(msg); go('lookup'); }
+  }
+  if (!moved) { after_('Saved'); return; }
+  MOVE2_CALL(function(r){
+    if (!r || r.notFound) { toast('Bike not found \u2014 rescan', true); return; }
+    if (current.newLoc) b.location = current.newLoc;
+    if (current.newStatus) b.status = current.newStatus;
+    after_('Saved \u2014 ' + ((r.changed || []).join('; ') || 'no change'));
+  }, function(){ toast('Save failed \u2014 check signal', true); });
+}
+
 function renderGreet_() {
   var el = document.getElementById('home-greet');
   if (!el) return;
   if (!user) { el.innerHTML = ''; return; }
   var hr = new Date().getHours();
-  var period = hr < 12 ? 'morning' : hr >= 16 ? 'evening' : '';
-  el.innerHTML = birthdayHtml_() + (period ? greetHtml_(period) : '') + comingUpHtml_();
+  var sp = specialOn_(isoDay_(new Date()));
+  var period = (sp && !sp.open) ? '' : hr < 12 ? 'morning' : hr >= GOODBYE_HOUR ? 'evening' : '';
+  el.innerHTML = specialHtml_(sp) + birthdayHtml_() + (period ? greetHtml_(period) : '') +
+                 (period === 'evening' ? closedTomorrowHtml_() : '') + comingUpHtml_();
   if (period === 'morning' && document.getElementById('g-wx')) {
     var site = mySite_();
     fetchWx_(site, function(wx){
@@ -1136,7 +1369,7 @@ function renderWq_() {
         (ticked[b.assetId] ? ' checked' : '') + ' onchange="wqChanged_()">' +
         ragDot_(p, isAdmin ? 'cycleBikePrio_(\'' + jsq_(b.assetId) + '\')' : '') +
         '<div onclick="wqOpen_(\'' + jsq_(code) + '\')" style="cursor:pointer"><b>' + b.assetId + '</b> \u00b7 ' +
-        KIND[it.k][1] + auto + '<div class="meta">' + (b.location || '?') + (t ? ' \u00b7 ' + t : '') + '</div>' +
+        KIND[it.k][1] + auto + '<div class="meta">' + (b.location || '?') + (t ? ' \u00b7 ' + t : '') + '</div>' + pendTag_(b) +
         extra + faultLine_(b.assetId) + '</div></div>';
     });
   });
@@ -1422,21 +1655,29 @@ function onCode(code) {
     show('view-pick');
   } else if (mode === 'tour-out' || mode === 'tour-in') {
     var dir = mode === 'tour-out' ? 'out' : 'in';
-    TOUR_CALL({ barcode: code, dir: dir, user: user, location: tourLoc,
+    var cp = (tourConfirm === code); tourConfirm = '';
+    TOUR_CALL({ barcode: code, dir: dir, user: user, location: tourLoc, confirmPending: cp,
       dueBack: (dir === 'out' && tourLoc === MULTI) ? multiBack : '',
       note: (dir === 'out' && tourLoc === MULTI) ? (document.getElementById('t-mname').value || '').trim() : '' }, function(r){
       if (!r || r.error || !r.assetId && !r.notFound && !r.blocked) {
         toast('Server is running old code \u2014 redeploy Code.gs (New version)', true); go('home'); return;
       }
       if (r.notFound) { toast('No bike carries ' + code + ' \u2014 assign it first', true); goTour_(); return; }
-      if (r.blocked) { toast(r.assetId + ' is ' + r.status + ' \u2014 not tour-ready', true); goTour_(); return; }
+      if (r.blocked && r.rideable) {
+        if (confirm(r.assetId + ' is on Pending check' + (r.fault ? ': ' + r.fault : '') + '.\n' +
+                    'Marked rideable' + (r.by ? ' by ' + r.by : '') + '.\n\nTake it out on this tour?')) {
+          tourConfirm = code; onCode(code);
+        } else { goTour_(); }
+        return;
+      }
+      if (r.blocked) { toast(r.assetId + ' is ' + (STATUS_LABELS[r.status] || r.status) + ' \u2014 not tour-ready', true); goTour_(); return; }
       if (r.already) { toast(r.assetId + ' is already out', true); goTour_(); return; }
       DB.onTour = (DB.onTour || []).filter(function(t){ return t.assetId !== r.assetId; });
       if (dir === 'out') DB.onTour.push({ assetId: r.assetId, guide: user, when: new Date().toISOString(), location: tourLoc,
         dueBack: tourLoc === MULTI ? multiBack : '', note: tourLoc === MULTI ? (document.getElementById('t-mname').value || '').trim() : '' });
       (DB.bikes || []).some(function(b){
         if (b.assetId === r.assetId) {
-          b.status = dir === 'out' ? 'On tour' : 'Available';
+          b.status = dir === 'out' ? 'On tour' : (b.pendRide ? 'Pending' : 'Available');
           if (tourLoc) b.location = tourLoc;
           return true;
         }
@@ -1591,6 +1832,7 @@ function openBikeByBarcode(bc, from) {
 function openBike(b, faults) {
   current.bike = b; current.newLoc = ''; current.newStatus = '';
   current.faults = faults || [];
+  current.pendRide = b.pendRide || ''; current.pendBy = b.pendBy || ''; current.gbWho = b.guideHolder || '';
   renderFaults_('b-faults', current.faults, false);
   faultSel = [];
   multiChips('f-chips', FAULT_CHIPS, function(sel){ faultSel = sel; });
@@ -1601,25 +1843,13 @@ function openBike(b, faults) {
   document.getElementById('b-loc').textContent = b.location || '—';
   document.getElementById('b-status').textContent = statusPill_(b.status).label;
   chipRow('locs', DB.locations, b.location, function(v){ current.newLoc = v; updateSave(); });
-  labelledStatusChips_('stats', b.status, function(v){ current.newStatus = v; updateSave(); });
+  labelledStatusChips_('stats', b.status, function(v){ current.newStatus = v; paintPend_(); paintGb_(); updateSave(); });
+  paintPend_();
+  paintGb_();
   updateSave();
   show('view-bike');
 }
-function labelledStatusChips_(id, currentVal, onPick) {
-  var el = document.getElementById(id);
-  el.innerHTML = '';
-  OUTCOMES.forEach(function(o){
-    var b = document.createElement('button');
-    b.className = 'chip' + (o.v === currentVal ? ' on' : '');
-    b.textContent = o.label;
-    b.onclick = function(){
-      Array.prototype.forEach.call(el.children, function(c){ c.classList.remove('on'); });
-      b.classList.add('on');
-      onPick(o.v);
-    };
-    el.appendChild(b);
-  });
-}
+
 function chipRow(id, values, currentVal, onPick) {
   var el = document.getElementById(id);
   el.innerHTML = '';
@@ -1635,21 +1865,8 @@ function chipRow(id, values, currentVal, onPick) {
     el.appendChild(b);
   });
 }
-function updateSave() {
-  var b = current.bike;
-  var changed = (current.newLoc && current.newLoc !== b.location) ||
-                (current.newStatus && current.newStatus !== b.status);
-  document.getElementById('save').disabled = !changed;
-}
-function saveMove() {
-  apiPost({ action: 'move', barcode: current.code, newLocation: current.newLoc, newStatus: current.newStatus, user: user }, function(r){
-    if (r.notFound) { toast('Bike not found — rescan', true); return; }
-    if (current.newLoc) current.bike.location = current.newLoc;
-    if (current.newStatus) current.bike.status = current.newStatus;
-    toast('Saved — ' + (r.changed.join('; ') || 'no change'));
-    go('lookup');
-  }, function(e){ toast('Save failed — check signal', true); });
-}
+
+
 
 /* ---------- ops dashboard ---------- */
 var SITES = [
@@ -1659,8 +1876,8 @@ var SITES = [
   { name: 'Franschhoek', type: 'SELLING' }
 ];
 var dashFilter = 'All';
-var STATUS_COLORS = { 'Available':'#1B7A3D', 'On tour':'#1D5FBF', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Pending':'#6E4A9E', 'Out of Service':'#D2141B', 'Retired':'#555555', 'Other':'#888888' };
-var STATUS_LABELS = { 'Available':'Ready to ride', 'On tour':'On tour', 'Workshop':'On the bench', 'Waiting for parts':'Waiting for parts', 'Pending':'Pending check', 'Out of Service':'Long-term down', 'Retired':'Retired', 'Other':'Other' };
+var STATUS_COLORS = { 'Available':'#1B7A3D', 'On tour':'#1D5FBF', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Pending':'#6E4A9E', 'Out of Service':'#D2141B', 'Retired':'#555555', 'Guide bike':'#0F6E56', 'Other':'#888888' };
+var STATUS_LABELS = { 'Available':'Ready to ride', 'On tour':'On tour', 'Workshop':'On the bench', 'Waiting for parts':'Waiting for parts', 'Pending':'Pending check', 'Out of Service':'Long-term down', 'Retired':'Retired', 'Guide bike':'Guide bike', 'Other':'Other' };
 
 function activeBikes_() { return DB.bikes.filter(function(b){ return b.active !== 'No'; }); }
 var ACCESSORY_CATS = ['Buggy', 'Baby seat', 'Trailer'];
@@ -1689,7 +1906,9 @@ function sizeOrder_(s) {
 function renderDash() {
   var bikes = activeBikes_();
 
-  /* headline */
+  /* headline: guide bikes are CAB's but not part of the tour fleet */
+  var gBikes = bikes.filter(function(b){ return b.status === 'Guide bike'; });
+  bikes = bikes.filter(function(b){ return b.status !== 'Guide bike'; });
   var total = bikes.length;
   var counts = {};
   bikes.forEach(function(b){
@@ -1703,16 +1922,25 @@ function renderDash() {
   }).length;
   document.getElementById('d-pct').textContent = pct + '%';
   document.getElementById('d-ready-sub').innerHTML =
-    ready + ' of ' + total + ' bikes' + (atHub ? '<br>' + atHub + ' ready but sitting at a hub' : '');
+    ready + ' of ' + total + ' tour bikes' + (atHub ? '<br>' + atHub + ' ready but sitting at a hub' : '');
   var bar = '', leg = '';
   DB.statuses.forEach(function(st){
+    if (st === 'Guide bike') return;
     var n = counts[st] || 0;
     if (n) bar += '<div style="width:' + (n / total * 100) + '%;background:' + STATUS_COLORS[st] + '"></div>';
-    leg += '<span><span class="dot" style="background:' + STATUS_COLORS[st] + '"></span>' +
+    leg += '<span' + (n ? ' class="legtap" data-st="' + st + '" onclick="showStat_(\'' + st + '\')"' : '') + '>' +
+           '<span class="dot" style="background:' + STATUS_COLORS[st] + '"></span>' +
            (STATUS_LABELS[st] || st) + ' <b>' + n + '</b></span>';
   });
   document.getElementById('d-bar').innerHTML = bar;
+  if (gBikes.length) {
+    var gGone = gBikes.filter(function(b){ return b.guideGone; }).length;
+    leg += '<span class="legtap" data-st="Guide bike" onclick="showStat_(\'Guide bike\')">' +
+           '<span class="dot" style="background:' + STATUS_COLORS['Guide bike'] + '"></span>Guide bikes <b>' + gBikes.length + '</b>' +
+           (gGone ? ' <b style="color:var(--red)">\u26a0 ' + gGone + ' with a leaver</b>' : '') + '</span>';
+  }
   document.getElementById('d-legend').innerHTML = leg;
+  paintStat_();
 
   /* filter chips */
   var ff = document.getElementById('d-filters');
@@ -1948,7 +2176,7 @@ var job = { work: [], mins: '', outcome: '', parts: [] };
 
 function statusPill_(st) {
   var o = null;
-  OUTCOMES.forEach(function(x){ if (x.v === st) o = x; });
+  OUTCOMES.concat([GUIDE_OUT]).forEach(function(x){ if (x.v === st) o = x; });
   return { label: o ? o.label : (st || 'No status'), cls: o ? o.cls : '' };
 }
 function fmtDate_(v) {
@@ -2076,6 +2304,9 @@ function BMOVE_CALL(code, ok, err) { apiPost({ action: 'move', barcode: code, ne
 function WTADD_CALL(p, ok, err) { p.action = 'wtaskadd'; p.pin = pin; apiPost(p, ok, err); }
 function WTDONE_CALL(rows, ok, err) { apiPost({ action: 'wtasksdone', rows: rows, user: user, pin: pin }, ok, err); }
 function FIXED_CALL(assets, ok, err) { apiPost({ action: 'bikesfixed', assets: assets, user: user, pin: pin }, ok, err); }
+function MOVE2_CALL(ok, err) { apiPost({ action: 'move', barcode: current.code, newLocation: current.newLoc, newStatus: current.newStatus, user: user }, ok, err); }
+function GB_CALL(p, ok, err) { apiPost({ action: 'guidebike', assetId: p.assetId, guide: p.guide, user: user }, ok, err); }
+function PEND_CALL(p, ok, err) { apiPost({ action: 'pending', assetId: p.assetId, rideable: p.rideable, readyBy: p.readyBy, user: user }, ok, err); }
 function CHEER_CALL(name, ok, err) { apiPost({ action: 'cheer', forName: name, user: user }, ok, err); }
 function PRIO_CALL(p, ok, err) { apiPost({ action: 'setprio', assetId: p.assetId, prio: p.prio, user: user, pin: pin }, ok, err); }
 function TPRIO_CALL(p, ok, err) { apiPost({ action: 'taskprio', row: p.row, prio: p.prio, user: user, pin: pin }, ok, err); }
