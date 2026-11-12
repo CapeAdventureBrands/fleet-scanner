@@ -186,6 +186,15 @@
     .greet .hav *, .greet .hav img, .hol::after, .confetti i { animation: none !important; }
     .hol::after, .confetti { display: none; }
   }
+  .gd-big { font-family:'Montserrat',sans-serif; font-size:15px; margin:14px 0 6px; }
+  .gd-big b { font-size:30px; font-weight:800; margin-right:6px; }
+  table.gd { width:100%; border-collapse:collapse; font-size:14px; margin-top:4px; }
+  table.gd td { padding:8px 4px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.gd td.n { font-weight:800; text-align:right; width:36px; }
+  table.gd td.sz { color:var(--grey); font-size:13px; }
+  .gsport { margin-top:10px; padding:8px 10px; font-size:14px; line-height:1.45; background:#EAF3DE; color:#27500A; }
+  .gsport.l { background:#F1EFE8; color:#444441; }
+  .gsport .hr { font-style:italic; font-size:13px; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -249,6 +258,10 @@
       <button class="tile" onclick="go('tour')" id="tile-tour">
         <div class="big">Tour bikes</div>
         <div class="sub">Scan bikes out for your tour &mdash; and back in after</div>
+      </button>
+      <button class="tile" onclick="go('gd')" id="tile-gdash">
+        <div class="big">Where are the bikes?</div>
+        <div class="sub">Ready bikes by size at each site, pending checks, what&rsquo;s out</div>
       </button>
       <button class="tile" onclick="requireRole('workshop','wq')" id="tile-wq">
         <div class="big">Bikes needing attention <span class="lock">&#128274;</span></div>
@@ -494,6 +507,15 @@
     <div id="mv-done"></div>
   </section>
 
+
+  <!-- GUIDE DASHBOARD -->
+  <section id="view-gd" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Where are the bikes?</h2>
+    <div class="chips" id="gd-site"></div>
+    <div id="gd-body"></div>
+  </section>
+
   <!-- TOUR HUB -->
   <section id="view-tour" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
@@ -583,7 +605,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwNv_0kXtOLDeQTtGZ_gSdssyRPdOZuyivjhZB6qX5R9KPLrPU5IAVfasTYyxYvIGvo/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbyRaRNqFZrwZ4cXq46bIykAcx1hJceKKbMydm1xSbDKbe28a707mCfuwyWEO_n2S6n0/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -596,7 +618,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B37';
+var UI_VERSION = 'B39';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -613,6 +635,7 @@ function paintSide_() {
     'tile-lookup': true,
     'tile-move': true,
     'tile-tour': !showOffice && !showWs,
+    'tile-gdash': !showOffice && !showWs,
     'tile-wq': showOffice || showWs,
     'tile-workshop': showOffice || showWs,
     'tile-order': showOffice || showWs,
@@ -704,7 +727,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -841,7 +864,7 @@ function greetHtml_(period) {
   if (period === 'morning') {
     head = 'Morning, ' + first;
     sub = '<span id="g-wx"></span>';
-    extra = morningFacts_();
+    extra = morningFacts_() + sportsHtml_();
   } else {
     head = 'That\u2019s a wrap, ' + first;
     var tt = (DB.todayTours || {})[user];
@@ -1134,6 +1157,105 @@ function celebrateHome_(guides) {
   return true;
 }
 
+/* ---- Guides' dashboard: Where are the bikes? (B38) ---- */
+var gdSite = '';
+var SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL'];
+function sizeOf_(b) {
+  var s = String(b.frameSize || '').trim().toUpperCase();
+  return SIZE_ORDER.indexOf(s) !== -1 ? s : '';
+}
+function renderGd_() {
+  var sites = (DB.locations || []).filter(function(l){ return l !== 'In Transit'; });
+  if (!gdSite) {
+    try { gdSite = localStorage.getItem('cab_site') || ''; } catch(e) {}
+    if (sites.indexOf(gdSite) === -1) gdSite = 'All sites';
+  }
+  pendChips_('gd-site', sites.concat(['All sites']).map(function(s){ return [s, s]; }), gdSite,
+    function(v){ gdSite = v; renderGd_(); });
+  var all = gdSite === 'All sites';
+  var here = function(b){ return all || b.location === gdSite; };
+  var bikes = activeBikes_().filter(function(b){ return b.status !== 'Guide bike'; });
+
+  // ready to ride, by type and size
+  var ready = bikes.filter(function(b){ return b.status === 'Available' && here(b); });
+  var cats = {};
+  ready.forEach(function(b){
+    var c = b.category || 'Other';
+    var e = cats[c] = cats[c] || { n: 0, sizes: {} };
+    e.n++;
+    var sz = sizeOf_(b);
+    if (sz) e.sizes[sz] = (e.sizes[sz] || 0) + 1;
+  });
+  var h = '<div class="gd-big"><b>' + ready.length + '</b>ready to ride' + (all ? ' across all sites' : ' at ' + gdSite) + '</div>';
+  var names = Object.keys(cats).sort(function(a, c){ return cats[c].n - cats[a].n; });
+  if (names.length) {
+    h += '<table class="gd">' + names.map(function(c){
+      var sz = SIZE_ORDER.filter(function(s){ return cats[c].sizes[s]; })
+        .map(function(s){ return s + ' ' + cats[c].sizes[s]; }).join(' \u00b7 ');
+      return '<tr><td><b>' + c + '</b>' + (sz ? '<div class="sz">' + sz + '</div>' : '') + '</td><td class="n">' + cats[c].n + '</td></tr>';
+    }).join('') + '</table>';
+  } else {
+    h += '<p class="note">No ready bikes here right now.</p>';
+  }
+
+  // pending check: may or may not be usable today
+  var pend = bikes.filter(function(b){ return b.status === 'Pending' && here(b); });
+  pend.sort(function(a, c){
+    var ra = a.pendRide === 'Yes' ? 0 : a.pendRide === 'No' ? 2 : 1, rc = c.pendRide === 'Yes' ? 0 : c.pendRide === 'No' ? 2 : 1;
+    if (ra !== rc) return ra - rc;
+    return (a.pendBy || '9999') < (c.pendBy || '9999') ? -1 : 1;
+  });
+  if (pend.length) {
+    var canUse = pend.filter(function(b){ return b.pendRide === 'Yes'; }).length;
+    h += '<h2>Pending check (' + pend.length + ')</h2>' +
+      '<p class="note">' + (canUse ? canUse + ' marked rideable \u2014 usable today if you need them; the scanner will ask you to confirm. ' : '') +
+      'Don\u2019t-ride bikes stay off tours.</p>';
+    pend.forEach(function(b){
+      var code = b.barcode || b.assetId;
+      var desc = [sizeOf_(b), b.category].filter(Boolean).join(' ');
+      h += '<div class="move" style="cursor:pointer" onclick="openBikeByBarcode(\'' + jsq_(code) + '\', \'gd\')"><b>' + b.assetId + '</b>' +
+        (desc ? ' \u00b7 ' + desc : '') + (all ? ' \u00b7 ' + (b.location || '?') : '') +
+        faultLine_(b.assetId) + pendTag_(b) + '</div>';
+    });
+  }
+
+  // out on tour
+  var out = (DB.onTour || []).filter(function(t){ return all || t.location === gdSite; });
+  if (out.length) {
+    var byG = {};
+    out.forEach(function(t){ (byG[t.guide || '?'] = byG[t.guide || '?'] || []).push(t); });
+    h += '<h2>Out on tour (' + out.length + ')</h2>';
+    Object.keys(byG).sort().forEach(function(g){
+      var items = byG[g];
+      var back = items[0].dueBack ? multiLabel_(items[0]) : 'back today';
+      h += '<div class="move"><b>' + g + '</b> \u00b7 ' + items.length + ' bike' + (items.length === 1 ? '' : 's') +
+        (all && items[0].location ? ' \u00b7 ' + items[0].location : '') + ' \u00b7 ' + back +
+        '<div class="meta">' + items.map(function(t){ return t.assetId; }).join(' \u00b7 ') + '</div></div>';
+    });
+  }
+  document.getElementById('gd-body').innerHTML = h;
+}
+
+/* ---- Sports results on the morning card (B39) ---- */
+var SPORT_ICON = { rugby: '\ud83c\udfc9', cricket: '\ud83c\udfcf', soccer: '\u26bd' };
+var HENNIE_REACT = {
+  W: ['I screamed so loud the neighbours called.', 'Five screams. Maybe six.', 'Hennie is doing laps of the vineyard.', 'Even Boris clapped.'],
+  L: ['Hennie is not talking about it.', 'Head down, feathers ruffled. Next time.', 'We go again. Hennie still believes.'],
+  D: ['Honours even. Hennie can\u2019t decide whether to scream.', 'A draw. Hennie screamed once, quietly.']
+};
+function sportsHtml_() {
+  var yIso = isoDay_(new Date(Date.now() - 864e5));
+  return (DB.scores || []).filter(function(s){ return s.date >= yIso; }).map(function(s){
+    var icon = SPORT_ICON[String(s.sport || '').toLowerCase()] || '\ud83c\udfc6';
+    if (s.text) return '<div class="gsport">' + icon + ' <b>' + s.team + '</b>: ' + s.text + '</div>';
+    var pool = HENNIE_REACT[s.res] || HENNIE_REACT.D;
+    var k = 0, key = s.team + s.date;
+    for (var i = 0; i < key.length; i++) k = (k * 31 + key.charCodeAt(i)) | 0;
+    return '<div class="gsport' + (s.res === 'L' ? ' l' : '') + '">' + icon + ' <b>' + s.team + ' ' + s.us + '\u2013' + s.them +
+      '</b> ' + s.opp + '<div class="hr">Hennie: \u201c' + pool[Math.abs(k) % pool.length] + '\u201d</div></div>';
+  }).join('');
+}
+
 function renderGreet_() {
   var el = document.getElementById('home-greet');
   if (!el) return;
@@ -1197,6 +1319,7 @@ function repaintVisible_() {
   if (vis('view-home')) go('home');
   else if (vis('view-dash')) renderDash();
   else if (vis('view-tour')) renderTourHub(true);
+  else if (vis('view-gd')) renderGd_();
 }
 function boot() {
   var cached = null;
@@ -1235,6 +1358,13 @@ function go(view) {
   } else if (view === 'gtask') {
     openGtask_();
     show('view-gtask');
+  } else if (view === 'gd') {
+    renderGd_();
+    show('view-gd');
+    REFRESH_DATA(function(){
+      var v = document.getElementById('view-gd');
+      if (v && !v.classList.contains('hidden')) renderGd_();
+    });
   } else if (view === 'mv') {
     mvSession = [];
     renderMv_();
