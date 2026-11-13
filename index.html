@@ -605,7 +605,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbyRaRNqFZrwZ4cXq46bIykAcx1hJceKKbMydm1xSbDKbe28a707mCfuwyWEO_n2S6n0/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbz5kfPQtapDX0b-ea5yrARQ_LXCG-uL1RLoMpP7NBI9g-snnci2HJlsYMfFAz4gLlJo/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -618,7 +618,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B39';
+var UI_VERSION = 'B40';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -2180,7 +2180,8 @@ function renderDash() {
     SITES.forEach(function(site){
       var here = cellBikes(size, site.name);
       var r = here.filter(function(b){ return b.status === 'Available'; }).length;
-      var down = here.length - r;
+      var tourN = here.filter(function(b){ return b.status === 'On tour'; }).length;
+      var down = here.length - r - tourN;
       rowTotal += here.length;
       readyCol[site.name] = (readyCol[site.name] || 0) + r;
       var cls = '';
@@ -2188,6 +2189,7 @@ function renderDash() {
         if (r === 0) cls = 'bad'; else if (r === 1) cls = 'warn';
       }
       cells += '<td class="' + cls + '" onclick="showCell(\'' + size.replace(/'/g,"\\'") + '\',\'' + site.name + '\')">' + r +
+               (tourN ? '<span class="down">' + tourN + ' on tour</span>' : '') +
                (down ? '<span class="down">' + down + ' down</span>' : '') + '</td>';
     });
     html += '<tr><td>' + size + '</td>' + cells + '<td><b>' + rowTotal + '</b></td></tr>';
