@@ -203,6 +203,9 @@
   .hev { display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:14px; }
   .hev .ic { width:22px; flex-shrink:0; text-align:center; }
   .hev .hm { font-size:12px; color:var(--grey); margin-top:2px; }
+  #hp-res .mres, #hp-prob .mres { display:flex; justify-content:space-between; gap:10px; align-items:center;
+    padding:10px 4px; border-bottom:1px solid var(--line); font-size:14px; cursor:pointer; }
+  #hp-res .mr-meta, #hp-prob .mr-meta { font-size:12px; color:var(--grey); text-align:right; flex-shrink:0; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -270,6 +273,10 @@
       <button class="tile" onclick="go('gd')" id="tile-gdash">
         <div class="big">Where are the bikes?</div>
         <div class="sub">Ready bikes by size at each site, pending checks, what&rsquo;s out</div>
+      </button>
+      <button class="tile" onclick="go('hpick')" id="tile-hist">
+        <div class="big">Bike history</div>
+        <div class="sub">Search or scan any bike &mdash; tours, workshop jobs, faults, moves</div>
       </button>
       <button class="tile" onclick="requireRole('workshop','wq')" id="tile-wq">
         <div class="big">Bikes needing attention <span class="lock">&#128274;</span></div>
@@ -358,7 +365,6 @@
       <div class="stackbar" id="d-bar"></div>
       <div class="legend" id="d-legend"></div>
       <div id="d-statlist"></div>
-      <div id="d-problems"></div>
     </div>
 
     <h2>What&rsquo;s where, by size</h2>
@@ -534,6 +540,19 @@
     <div id="h-body"><p class="note">Loading history&hellip;</p></div>
   </section>
 
+
+  <!-- BIKE HISTORY PICKER -->
+  <section id="view-hpick" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Bike history</h2>
+    <div class="manual" style="margin-top:6px">
+      <input type="text" id="hp-q" autocomplete="off" placeholder="Bike name or barcode &mdash; e.g. BNW 14" oninput="hpSearch_()">
+      <button class="primary" onclick="go('hist-scan')">Scan</button>
+    </div>
+    <div id="hp-res"></div>
+    <div id="hp-prob"></div>
+  </section>
+
   <!-- TOUR HUB -->
   <section id="view-tour" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
@@ -624,7 +643,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxUotBxiU75_bIY9flN-1i-5q6WGscnotBbvB1EnZEOtaJdc4Bikx1O6OtJui6G4i6E/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwByDIsrXzvyIHd6edaGXOKy8q8X-HsrzRFwtwPtHRSfcazxrLeVE_TU2SDGLxpLN3P/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -637,7 +656,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B41';
+var UI_VERSION = 'B43';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -656,6 +675,7 @@ function paintSide_() {
     'tile-tour': !showOffice && !showWs,
     'tile-gdash': !showOffice && !showWs,
     'tile-wq': showOffice || showWs,
+    'tile-hist': showOffice || showWs,
     'tile-workshop': showOffice || showWs,
     'tile-order': showOffice || showWs,
     'tile-wtasks': showOffice || showWs,
@@ -746,7 +766,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -1368,12 +1388,12 @@ function renderHistory_() {
   pendChips_('h-filters', Object.keys(HIST_FILTERS).map(function(k){ return [k, k]; }), histFilter,
     function(v){ histFilter = v; histShown = 30; renderHistory_(); });
 }
-function openHistoryFor_(aid) {
+function openHistoryFor_(aid, back) {
   var b = null;
   (DB.bikes || []).some(function(x){ if (x.assetId === aid) { b = x; return true; } });
   if (!b) return;
   current.bike = b;
-  openHistory_('view-dash');
+  openHistory_(back || 'view-dash');
 }
 function renderProblems_() {
   var el = document.getElementById('d-problems');
@@ -1386,6 +1406,38 @@ function renderProblems_() {
       return '<div class="move" style="cursor:pointer" onclick="openHistoryFor_(\'' + jsq_(b.assetId) + '\')"><b>' + b.assetId + '</b> \u00b7 ' +
         (b.location || '?') + '<div class="meta" style="color:var(--red)">' + b.problem + '</div></div>';
     }).join('');
+}
+
+/* ---- Bike history picker (B42) ---- */
+function findBikeLocal_(code) {
+  var c = String(code || '').trim(), n = normCode_(c), hit = null;
+  (DB.bikes || []).some(function(b){
+    if ((b.barcode && String(b.barcode) === c) || (n && normCode_(b.assetId) === n)) { hit = b; return true; }
+  });
+  return hit;
+}
+function hpRow_(b, meta) {
+  return '<div class="mres" onclick="openHistoryFor_(\'' + jsq_(b.assetId) + '\', \'view-hpick\')"><span><b>' + b.assetId + '</b></span>' +
+    '<span class="mr-meta">' + meta + '</span></div>';
+}
+function hpSearch_() {
+  var q = document.getElementById('hp-q').value.trim(), nq = normCode_(q), box = document.getElementById('hp-res');
+  if (q.length < 2 || !nq) { box.innerHTML = ''; return; }
+  var hits = (DB.bikes || []).filter(function(b){
+    return normCode_(b.assetId).indexOf(nq) !== -1 || String(b.barcode || '').indexOf(q) === 0;
+  }).slice(0, 10);
+  box.innerHTML = hits.length
+    ? hits.map(function(b){ return hpRow_(b, (STATUS_LABELS[b.status] || b.status || '') + (b.location ? ' &middot; ' + b.location : '')); }).join('')
+    : '<p class="note">No bike matches &ldquo;' + q.replace(/</g, '&lt;') + '&rdquo;.</p>';
+}
+function renderHpick_() {
+  document.getElementById('hp-q').value = '';
+  document.getElementById('hp-res').innerHTML = '';
+  var probs = (DB.bikes || []).filter(function(b){ return b.problem && b.active !== 'No'; });
+  document.getElementById('hp-prob').innerHTML = probs.length
+    ? '<h2 style="color:var(--red)">\u2691 Problem bikes (' + probs.length + ')</h2>' +
+      probs.map(function(b){ return hpRow_(b, '<span style="color:var(--red)">' + b.problem + '</span>'); }).join('')
+    : '';
 }
 
 function renderGreet_() {
@@ -1490,6 +1542,9 @@ function go(view) {
   } else if (view === 'gtask') {
     openGtask_();
     show('view-gtask');
+  } else if (view === 'hpick') {
+    renderHpick_();
+    show('view-hpick');
   } else if (view === 'gd') {
     renderGd_();
     show('view-gd');
@@ -1538,14 +1593,15 @@ function go(view) {
   } else if (view === 'tour-in') {
     renderTourIn_();
     show('view-tourin');
-  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in-scan' || view === 'move-scan') {
+  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in-scan' || view === 'move-scan' || view === 'hist-scan') {
     mode = (view === 'tour-in-scan') ? 'tour-in' : view;
     document.getElementById('scan-title').textContent =
       view === 'assign' ? 'Scan the sticker on the bike'
       : view === 'workshop' ? 'Scan the bike you worked on'
       : view === 'tour-out' ? 'Scan each bike going on tour \u2014 ' + tourLoc
       : view === 'tour-in-scan' ? 'Scan each bike coming back to ' + tourLoc
-      : view === 'move-scan' ? 'Scan each bike going to ' + mvLoc : 'Scan a bike';
+      : view === 'move-scan' ? 'Scan each bike going to ' + mvLoc
+      : view === 'hist-scan' ? 'Scan a bike to see its history' : 'Scan a bike';
     document.getElementById('manual').value = '';
     var mr = document.getElementById('m-results'); if (mr) mr.innerHTML = '';
     var sb = document.getElementById('snapbtn');
@@ -2020,6 +2076,11 @@ function onCode(code) {
         toast(r.assetId + (dir === 'out' ? ' \u2014 out at ' + tourLoc + ' (' + tourSession.length + ')' : ' \u2014 back in at ' + tourLoc));
       goTour_();            // straight back to the scanner \u2014 next bike
     }, function(){ toast('Save failed \u2014 check signal', true); goTour_(); });
+  } else if (mode === 'hist-scan') {
+    var hb = findBikeLocal_(code);
+    if (!hb) { toast('No bike carries ' + code + ' \u2014 try the name', true); go('hist-scan'); return; }
+    current.bike = hb;
+    openHistory_('view-hpick');
   } else if (mode === 'move-scan') {
     BMOVE_CALL(code, function(r){
       if (r && r.notFound) { toast('No bike carries ' + code + ' \u2014 assign it first', true); go('move-scan'); return; }
@@ -2274,7 +2335,6 @@ function renderDash() {
   }
   document.getElementById('d-legend').innerHTML = leg;
   paintStat_();
-  renderProblems_();
 
   /* filter chips */
   var ff = document.getElementById('d-filters');
