@@ -195,6 +195,14 @@
   .gsport { margin-top:10px; padding:8px 10px; font-size:14px; line-height:1.45; background:#EAF3DE; color:#27500A; }
   .gsport.l { background:#F1EFE8; color:#444441; }
   .gsport .hr { font-style:italic; font-size:13px; }
+  .hgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+  .hcell { border:2px solid var(--black); padding:10px; }
+  .hcell .v { font-family:'Montserrat',sans-serif; font-weight:800; font-size:20px; }
+  .hcell .k { font-size:12px; color:var(--grey); }
+  .hprob { background:#FCEBEB; color:#791F1F; border:2px solid #D2141B; padding:10px 12px; margin-top:12px; font-size:13px; }
+  .hev { display:flex; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:14px; }
+  .hev .ic { width:22px; flex-shrink:0; text-align:center; }
+  .hev .hm { font-size:12px; color:var(--grey); margin-top:2px; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -350,6 +358,7 @@
       <div class="stackbar" id="d-bar"></div>
       <div class="legend" id="d-legend"></div>
       <div id="d-statlist"></div>
+      <div id="d-problems"></div>
     </div>
 
     <h2>What&rsquo;s where, by size</h2>
@@ -394,6 +403,7 @@
         </div>
         <div id="j-faults"></div>
         <div id="j-hist"></div>
+        <button class="quiet" style="width:100%;margin-top:6px" onclick="openHistory_('view-job')">&#128214; Full bike history</button>
       </div>
     </div>
 
@@ -516,6 +526,14 @@
     <div id="gd-body"></div>
   </section>
 
+
+  <!-- BIKE HISTORY -->
+  <section id="view-hist" class="hidden">
+    <button class="back" onclick="show(histBack)">&#8249; Back</button>
+    <div class="card"><div class="num" id="h-num"></div><div class="meta" id="h-meta"></div></div>
+    <div id="h-body"><p class="note">Loading history&hellip;</p></div>
+  </section>
+
   <!-- TOUR HUB -->
   <section id="view-tour" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
@@ -574,6 +592,7 @@
         <div class="fact"><div class="v" id="b-status"></div><div class="k">Status</div></div>
       </div>
     </div>
+    <button class="quiet" style="width:100%;margin-top:10px" onclick="openHistory_('view-bike')">&#128214; Bike history</button>
     <div id="b-faults"></div>
     <h2>Report a fault</h2>
     <div class="chips" id="f-chips"></div>
@@ -605,7 +624,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbz5kfPQtapDX0b-ea5yrARQ_LXCG-uL1RLoMpP7NBI9g-snnci2HJlsYMfFAz4gLlJo/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxUotBxiU75_bIY9flN-1i-5q6WGscnotBbvB1EnZEOtaJdc4Bikx1O6OtJui6G4i6E/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -618,7 +637,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B40';
+var UI_VERSION = 'B41';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -727,7 +746,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -1256,6 +1275,119 @@ function sportsHtml_() {
   }).join('');
 }
 
+/* ---- Bike history (B41) ---- */
+var histBack = 'view-bike', histData = null, histFilter = 'All', histShown = 30;
+function problemTag_(b) {
+  return (b && b.problem && roleRank_(role) >= 1) ? '<div class="meta" style="color:var(--red)">\u2691 Problem bike \u00b7 ' + b.problem + '</div>' : '';
+}
+function fmtWhen_(ts) {
+  var d = new Date(ts);
+  if (isNaN(d)) return '';
+  var t = isoDay_(d) === isoDay_(new Date()) ? 'today' : DAYS_[d.getDay()].slice(0, 3) + ' ' + d.getDate() + ' ' + MON_[d.getMonth()];
+  if (d.getFullYear() !== new Date().getFullYear()) t += ' ' + d.getFullYear();
+  return t;
+}
+function daysBetween_(a, b) { return Math.max(0, Math.round((new Date(b) - new Date(a)) / 864e5)); }
+function labSt_(st) { st = String(st || '').trim(); return STATUS_LABELS[st] || st; }
+function moveText_(det) {
+  return String(det || '').split('; ').map(function(p){
+    var m = p.match(/^(Location|Status)\s+(.+?)\s*(?:→|->)\s*(.+)$/);
+    if (!m) return p;
+    return m[1] === 'Location' ? m[2] + ' → ' + m[3] : 'status ' + labSt_(m[2]) + ' → ' + labSt_(m[3]);
+  }).join(' · ');
+}
+function openHistory_(back) {
+  var b = current.bike;
+  if (!b) return;
+  histBack = back; histFilter = 'All'; histShown = 30; histData = null;
+  document.getElementById('h-num').textContent = b.assetId;
+  document.getElementById('h-meta').textContent = [b.category, b.brand, b.frameSize, b.colour, b.barcode ? 'barcode ' + b.barcode : ''].filter(Boolean).join(' \u00b7 ');
+  document.getElementById('h-body').innerHTML = '<p class="note">Loading history\u2026</p>';
+  show('view-hist');
+  HIST_CALL(b.assetId, function(r){
+    if (!r || r.error) { document.getElementById('h-body').innerHTML = '<p class="note">' + ((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)') + '</p>'; return; }
+    histData = r;
+    renderHistory_();
+  }, function(){ document.getElementById('h-body').innerHTML = '<p class="note">Couldn\u2019t load history \u2014 check signal and try again.</p>'; });
+}
+function histEvHtml_(e) {
+  var ic = '\ud83c\udff7', title = '', meta = fmtWhen_(e.when);
+  if (e.type === 'tour') {
+    ic = '\ud83d\udeb2';
+    title = '<b>Tour</b> \u00b7 out with ' + (e.guide || '?') + (e.site ? ' from ' + e.site : '');
+    if (e.back) {
+      var dd = daysBetween_(e.when, e.back), hrs = Math.round((new Date(e.back) - new Date(e.when)) / 36e5);
+      meta += ' \u00b7 ' + (isoDay_(new Date(e.back)) === isoDay_(new Date(e.when)) ? 'back same day' + (hrs > 0 ? ', ' + hrs + ' h' : '') : 'back ' + fmtWhen_(e.back) + ' (' + dd + ' days)');
+    } else meta += e.due ? ' \u00b7 multi-day, due back ' + niceDay_(e.due) : ' \u00b7 still out';
+    if (e.note) meta += ' \u00b7 ' + e.note;
+  } else if (e.type === 'job') {
+    ic = '\ud83d\udd27';
+    title = '<b>Workshop</b> \u00b7 ' + (e.work || 'work logged') + (e.service ? ' \u00b7 <span style="color:#1B7A2D">service</span>' : '');
+    meta += [e.by, e.mins ? e.mins + ' min' : '', e.parts, e.outcome ? '\u2192 ' + labSt_(e.outcome) : ''].filter(Boolean).map(function(x){ return ' \u00b7 ' + x; }).join('');
+  } else if (e.type === 'fault') {
+    ic = '\u26a0\ufe0f';
+    title = '<b>Fault</b> \u00b7 \u201c' + e.fault + '\u201d';
+    meta += (e.by ? ' \u00b7 reported by ' + e.by : '') +
+      (e.open ? ' \u00b7 <b style="color:var(--red)">still open, ' + daysBetween_(e.when, new Date()) + ' days</b>'
+              : (e.fixed ? ' \u00b7 fixed in ' + daysBetween_(e.when, e.fixed) + ' day' + (daysBetween_(e.when, e.fixed) === 1 ? '' : 's') : ' \u00b7 fixed'));
+  } else if (e.type === 'part') {
+    ic = '\ud83d\udce6';
+    title = '<b>Part ordered</b> \u00b7 ' + e.part + (e.qty && e.qty !== '1' ? ' \u00d7' + e.qty : '') + (/urgent/i.test(e.prio) ? ' <b style="color:var(--red)">urgent</b>' : '');
+    meta += (e.by ? ' \u00b7 ' + e.by : '') + (e.open ? ' \u00b7 still waiting' : (e.done ? ' \u00b7 arrived ' + fmtWhen_(e.done) : ''));
+  } else if (e.type === 'move') {
+    ic = '\ud83d\ude9a';
+    title = '<b>Moved</b> \u00b7 ' + moveText_(e.detail);
+    meta += e.by ? ' \u00b7 ' + e.by : '';
+  } else {
+    ic = e.action === 'Quick fix' ? '\u2705' : e.action === 'Pending check' ? '\u23f8\ufe0f' : e.action === 'Guide bike' ? '\ud83d\udeb2' : '\ud83c\udff7';
+    title = '<b>' + e.action + '</b> \u00b7 ' + String(e.detail || '').replace(/\d{4}-\d{2}-\d{2}/g, function(x){ return niceDay_(x); });
+    meta += e.by ? ' \u00b7 ' + e.by : '';
+  }
+  return '<div class="hev"><div class="ic">' + ic + '</div><div><div>' + title + '</div><div class="hm">' + meta + '</div></div></div>';
+}
+var HIST_FILTERS = { 'All': null, 'Tours': ['tour'], 'Workshop': ['job', 'part', 'Quick fix'], 'Faults': ['fault'], 'Moves': ['move', 'Pending check', 'Guide bike', 'Priority'] };
+function renderHistory_() {
+  var r = histData, s = r.summary, h = '';
+  if (s.problem && roleRank_(role) >= 1) h += '<div class="hprob">\u2691 <b>Problem bike</b> \u2014 ' + s.problem + '. Fix it properly, or time to retire it?</div>';
+  h += '<div class="hgrid">' +
+    '<div class="hcell"><div class="k">Tours</div><div class="v">' + s.tours + '</div><div class="k">' + s.toursMonth + ' this month</div></div>' +
+    '<div class="hcell"><div class="k">Since last service</div><div class="v">' + s.tourDays + ' of ' + s.serviceAfter + '</div><div class="k">tour days' + (s.lastService ? ' \u00b7 serviced ' + fmtWhen_(s.lastService) : ' \u00b7 no service recorded') + '</div></div>' +
+    '<div class="hcell"><div class="k">Workshop</div><div class="v">' + s.jobs + ' job' + (s.jobs === 1 ? '' : 's') + '</div><div class="k">' + (s.mins >= 60 ? Math.floor(s.mins / 60) + ' h ' : '') + (s.mins % 60) + ' min in total</div></div>' +
+    '<div class="hcell"><div class="k">Rideable</div><div class="v">' + (s.rideable === null ? '\u2014' : s.rideable + '%') + '</div><div class="k">of the last 90 days</div></div>' +
+    '</div>';
+  var extras = [];
+  if (s.openFaults) extras.push('<b style="color:var(--red)">' + s.openFaults + ' open fault' + (s.openFaults === 1 ? '' : 's') + '</b>');
+  if (s.common) extras.push('Most common fault: <b>' + s.common + '</b>');
+  if (extras.length) h += '<p class="note" style="margin-top:10px">' + extras.join(' \u00b7 ') + '</p>';
+  h += '<div class="chips" id="h-filters" style="margin-top:12px"></div>';
+  var f = HIST_FILTERS[histFilter];
+  var list = r.events.filter(function(e){ return !f || f.indexOf(e.type) !== -1 || (e.action && f.indexOf(e.action) !== -1); });
+  h += list.slice(0, histShown).map(histEvHtml_).join('') || '<p class="note">Nothing recorded here yet.</p>';
+  if (list.length > histShown) h += '<button class="quiet" style="width:100%;margin-top:10px" onclick="histShown+=30;renderHistory_()">Show older (' + (list.length - histShown) + ' more)</button>';
+  document.getElementById('h-body').innerHTML = h;
+  pendChips_('h-filters', Object.keys(HIST_FILTERS).map(function(k){ return [k, k]; }), histFilter,
+    function(v){ histFilter = v; histShown = 30; renderHistory_(); });
+}
+function openHistoryFor_(aid) {
+  var b = null;
+  (DB.bikes || []).some(function(x){ if (x.assetId === aid) { b = x; return true; } });
+  if (!b) return;
+  current.bike = b;
+  openHistory_('view-dash');
+}
+function renderProblems_() {
+  var el = document.getElementById('d-problems');
+  if (!el) return;
+  var list = activeBikes_().filter(function(b){ return b.problem; });
+  if (!list.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<h2 style="color:var(--red)">\u2691 Problem bikes (' + list.length + ')</h2>' +
+    '<p class="note">3+ faults or 4+ workshop jobs in 60 days. Tap for the full history.</p>' +
+    list.map(function(b){
+      return '<div class="move" style="cursor:pointer" onclick="openHistoryFor_(\'' + jsq_(b.assetId) + '\')"><b>' + b.assetId + '</b> \u00b7 ' +
+        (b.location || '?') + '<div class="meta" style="color:var(--red)">' + b.problem + '</div></div>';
+    }).join('');
+}
+
 function renderGreet_() {
   var el = document.getElementById('home-greet');
   if (!el) return;
@@ -1564,7 +1696,7 @@ function renderWq_() {
         (ticked[b.assetId] ? ' checked' : '') + ' onchange="wqChanged_()">' +
         ragDot_(p, isAdmin ? 'cycleBikePrio_(\'' + jsq_(b.assetId) + '\')' : '') +
         '<div onclick="wqOpen_(\'' + jsq_(code) + '\')" style="cursor:pointer"><b>' + b.assetId + '</b> \u00b7 ' +
-        KIND[it.k][1] + auto + '<div class="meta">' + (b.location || '?') + (t ? ' \u00b7 ' + t : '') + '</div>' + pendTag_(b) +
+        KIND[it.k][1] + auto + '<div class="meta">' + (b.location || '?') + (t ? ' \u00b7 ' + t : '') + '</div>' + pendTag_(b) + problemTag_(b) +
         extra + faultLine_(b.assetId) + '</div></div>';
     });
   });
@@ -2142,6 +2274,7 @@ function renderDash() {
   }
   document.getElementById('d-legend').innerHTML = leg;
   paintStat_();
+  renderProblems_();
 
   /* filter chips */
   var ff = document.getElementById('d-filters');
@@ -2508,6 +2641,7 @@ function WTADD_CALL(p, ok, err) { p.action = 'wtaskadd'; p.pin = pin; apiPost(p,
 function WTDONE_CALL(rows, ok, err) { apiPost({ action: 'wtasksdone', rows: rows, user: user, pin: pin }, ok, err); }
 function FIXED_CALL(assets, ok, err) { apiPost({ action: 'bikesfixed', assets: assets, user: user, pin: pin }, ok, err); }
 function MOVE2_CALL(ok, err) { apiPost({ action: 'move', barcode: current.code, newLocation: current.newLoc, newStatus: current.newStatus, user: user }, ok, err); }
+function HIST_CALL(aid, ok, err) { apiPost({ action: 'history', assetId: aid }, ok, err); }
 function GB_CALL(p, ok, err) { apiPost({ action: 'guidebike', assetId: p.assetId, guide: p.guide, user: user }, ok, err); }
 function PEND_CALL(p, ok, err) { apiPost({ action: 'pending', assetId: p.assetId, rideable: p.rideable, readyBy: p.readyBy, user: user }, ok, err); }
 function CHEER_CALL(name, ok, err) { apiPost({ action: 'cheer', forName: name, user: user }, ok, err); }
