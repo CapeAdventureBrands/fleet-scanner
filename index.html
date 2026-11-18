@@ -206,6 +206,15 @@
   #hp-res .mres, #hp-prob .mres { display:flex; justify-content:space-between; gap:10px; align-items:center;
     padding:10px 4px; border-bottom:1px solid var(--line); font-size:14px; cursor:pointer; }
   #hp-res .mr-meta, #hp-prob .mr-meta { font-size:12px; color:var(--grey); text-align:right; flex-shrink:0; }
+  .heads { background:#FFF6DB; border-left:4px solid #E0A800; border-radius:6px; padding:8px 10px; margin-top:10px; font-size:14px; color:#4A3B00; }
+  .heads .m { font-size:12px; color:#8A6510; margin-top:2px; }
+  .heads .hb { display:flex; gap:8px; margin-top:8px; }
+  .heads .hb button { flex:1; margin:0; padding:8px 6px; font-size:13px; }
+  a.thumb { display:inline-block; margin-top:6px; }
+  a.thumb img { max-width:140px; max-height:140px; border-radius:6px; display:block; border:1px solid var(--line); }
+  #rp-res .mres { display:flex; justify-content:space-between; gap:10px; align-items:center;
+    padding:10px 4px; border-bottom:1px solid var(--line); font-size:14px; cursor:pointer; }
+  #rp-res .mr-meta { font-size:12px; color:var(--grey); text-align:right; flex-shrink:0; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -261,6 +270,10 @@
       <button class="tile" onclick="go('lookup')" id="tile-lookup">
         <div class="big">Check a bike</div>
         <div class="sub">Scan or search &mdash; status, faults, report a problem</div>
+      </button>
+      <button class="tile" onclick="go('rp')" id="tile-rp">
+        <div class="big">Report a bike problem</div>
+        <div class="sub">Something wrong, or worth knowing &mdash; add a photo</div>
       </button>
       <button class="tile" onclick="go('mv')" id="tile-move">
         <div class="big">Move bikes</div>
@@ -407,6 +420,7 @@
           <div class="fact"><div class="v" id="j-wheel"></div><div class="k">Wheel</div></div>
           <div class="fact" style="grid-column:1 / -1"><div class="v" id="j-lastserv"></div><div class="k">Last service</div></div>
         </div>
+        <div id="j-heads"></div>
         <div id="j-faults"></div>
         <div id="j-hist"></div>
         <button class="quiet" style="width:100%;margin-top:6px" onclick="openHistory_('view-job')">&#128214; Full bike history</button>
@@ -421,6 +435,10 @@
     <h2>Parts used</h2>
     <div class="chips" id="j-parts-chips"></div>
     <input type="text" id="j-parts" placeholder="Other parts (optional)" style="margin-top:10px" autocomplete="off">
+    <h2>Photo</h2>
+    <input type="file" id="j-photo" accept="image/*" class="hidden" onchange="photoPicked_('j', this)">
+    <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('j-photo').click()">&#128247; Add a photo (optional) &mdash; damage, serial, before/after</button>
+    <p class="note" id="j-photo-note"></p>
     <h2>Where does it stand now?</h2>
     <div class="chips" id="j-outcome"></div>
     <div id="j-partneed-wrap" style="display:none">
@@ -553,6 +571,40 @@
     <div id="hp-prob"></div>
   </section>
 
+
+  <!-- REPORT A BIKE PROBLEM (B45) -->
+  <section id="view-rp" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Report a bike problem</h2>
+    <div id="rp-find">
+      <div class="manual" style="margin-top:6px">
+        <input type="text" id="rp-q" autocomplete="off" placeholder="Bike name or barcode &mdash; e.g. E-Bike 26" oninput="rpSearch_()">
+        <button class="primary" onclick="go('rp-scan')">Scan</button>
+      </div>
+      <div id="rp-res"></div>
+    </div>
+    <div id="rp-form" style="display:none">
+      <div class="card"><div class="num" id="rp-num"></div><div class="meta" id="rp-meta"></div>
+        <a href="#" onclick="rpReset_();return false" style="font-size:13px">change bike</a></div>
+      <div id="rp-heads"></div>
+      <div id="rp-faults"></div>
+      <h2>What&rsquo;s wrong?</h2>
+      <div class="chips" id="rp-chips"></div>
+      <input type="text" id="rp-text" placeholder="Describe it &mdash; e.g. screen connector comes loose" style="margin-top:10px" autocomplete="off" oninput="rpPaint_()">
+    <input type="file" id="rp-photo" accept="image/*" class="hidden" onchange="photoPicked_('rp', this)">
+    <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('rp-photo').click()">&#128247; Add a photo (optional)</button>
+    <p class="note" id="rp-photo-note"></p>
+      <h2>Can it still be ridden?</h2>
+      <div class="chips" id="rp-ride"></div>
+      <p class="note" id="rp-lock" style="display:none;color:var(--red);margin:6px 0 0">Brakes or steering &mdash; it can&rsquo;t go out until the workshop has checked it.</p>
+      <p class="note" id="rp-what" style="margin-top:8px"></p>
+      <div class="bar">
+        <button class="quiet" onclick="go('home')">Cancel</button>
+        <button class="primary" id="rp-send" onclick="rpSend_()" disabled>Send</button>
+      </div>
+    </div>
+  </section>
+
   <!-- TOUR HUB -->
   <section id="view-tour" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
@@ -612,10 +664,14 @@
       </div>
     </div>
     <button class="quiet" style="width:100%;margin-top:10px" onclick="openHistory_('view-bike')">&#128214; Bike history</button>
+    <div id="b-heads"></div>
     <div id="b-faults"></div>
     <h2>Report a fault</h2>
     <div class="chips" id="f-chips"></div>
     <input type="text" id="f-text" placeholder="What's wrong? (add detail)" style="margin-top:10px" autocomplete="off">
+    <input type="file" id="f-photo" accept="image/*" class="hidden" onchange="photoPicked_('f', this)">
+    <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('f-photo').click()">&#128247; Add a photo (optional)</button>
+    <p class="note" id="f-photo-note"></p>
     <button class="quiet" style="width:100%;margin-top:10px" id="f-send" onclick="sendFault()">Log fault for the workshop</button>
     <h2>Move to</h2>
     <div class="chips" id="locs"></div>
@@ -643,7 +699,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxORrNMTsCs8QpMbvr4lD4kfKUwUFlJ2KYK0A4TzNgYerElqh6oiujEMlCN4U33JiTZ/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbweFxJgtFWhlP5QMIpum8eLINiWyQlqcA4rYKJvTQWy5T_bvFPp8TRkqx6OVLx9VgDV/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -656,7 +712,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B44';
+var UI_VERSION = 'B45';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -671,6 +727,7 @@ function paintSide_() {
   var showWs = side === 'workshop';
   var vis = {
     'tile-lookup': true,
+    'tile-rp': true,
     'tile-move': true,
     'tile-tour': !showOffice && !showWs,
     'tile-gdash': !showOffice && !showWs,
@@ -766,7 +823,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -1254,7 +1311,18 @@ function renderGd_() {
       var desc = [sizeOf_(b), b.category].filter(Boolean).join(' ');
       h += '<div class="move" style="cursor:pointer" onclick="openBikeByBarcode(\'' + jsq_(code) + '\', \'gd\')"><b>' + b.assetId + '</b>' +
         (desc ? ' \u00b7 ' + desc : '') + (all ? ' \u00b7 ' + (b.location || '?') : '') +
-        faultLine_(b.assetId) + pendTag_(b) + '</div>';
+        faultLine_(b.assetId) + headsLine_(b.assetId) + pendTag_(b) + '</div>';
+    });
+  }
+
+  // heads-ups: rides fine, but be aware
+  var hb = bikes.filter(function(b){ return here(b) && notesFor_(b.assetId).length; });
+  if (hb.length) {
+    h += '<h2 style="color:#8A6510">\u26a0 Heads-ups (' + hb.length + ')</h2><p class="note">These ride fine \u2014 just know about it before the tour.</p>';
+    hb.forEach(function(b){
+      var code = b.barcode || b.assetId;
+      h += '<div class="move" style="cursor:pointer" onclick="openBikeByBarcode(\'' + jsq_(code) + '\', \'gd\')"><b>' + b.assetId + '</b>' +
+        (all ? ' \u00b7 ' + (b.location || '?') : '') + ' \u00b7 ' + labSt_(b.status) + headsLine_(b.assetId) + '</div>';
     });
   }
 
@@ -1350,6 +1418,12 @@ function histEvHtml_(e) {
     meta += (e.by ? ' \u00b7 reported by ' + e.by : '') +
       (e.open ? ' \u00b7 <b style="color:var(--red)">still open, ' + daysBetween_(e.when, new Date()) + ' days</b>'
               : (e.fixed ? ' \u00b7 fixed in ' + daysBetween_(e.when, e.fixed) + ' day' + (daysBetween_(e.when, e.fixed) === 1 ? '' : 's') : ' \u00b7 fixed'));
+  } else if (e.type === 'note') {
+    ic = '\ud83d\udfe1';
+    title = '<b>Heads-up</b> \u00b7 \u201c' + escH_(e.note) + '\u201d';
+    meta += (e.by ? ' \u00b7 ' + e.by : '') + (e.state === 'Open' ? ' \u00b7 <b style="color:#8A6510">still on the bike</b>'
+      : e.state === 'Became a fault' ? ' \u00b7 became a fault' + (e.cleared ? ' ' + fmtWhen_(e.cleared) : '')
+      : ' \u00b7 cleared' + (e.cleared ? ' ' + fmtWhen_(e.cleared) : '') + (e.clearedBy ? ' by ' + e.clearedBy : ''));
   } else if (e.type === 'part') {
     ic = '\ud83d\udce6';
     title = '<b>Part ordered</b> \u00b7 ' + e.part + (e.qty && e.qty !== '1' ? ' \u00d7' + e.qty : '') + (/urgent/i.test(e.prio) ? ' <b style="color:var(--red)">urgent</b>' : '');
@@ -1363,9 +1437,9 @@ function histEvHtml_(e) {
     title = '<b>' + e.action + '</b> \u00b7 ' + String(e.detail || '').replace(/\d{4}-\d{2}-\d{2}/g, function(x){ return niceDay_(x); });
     meta += e.by ? ' \u00b7 ' + e.by : '';
   }
-  return '<div class="hev"><div class="ic">' + ic + '</div><div><div>' + title + '</div><div class="hm">' + meta + '</div></div></div>';
+  return '<div class="hev"><div class="ic">' + ic + '</div><div><div>' + title + '</div><div class="hm">' + meta + '</div>' + thumb_(e.photo) + '</div></div>';
 }
-var HIST_FILTERS = { 'All': null, 'Tours': ['tour'], 'Workshop': ['job', 'part', 'Quick fix'], 'Faults': ['fault'], 'Moves': ['move', 'Pending check', 'Guide bike', 'Priority'] };
+var HIST_FILTERS = { 'All': null, 'Tours': ['tour'], 'Workshop': ['job', 'part', 'Quick fix'], 'Faults': ['fault', 'note'], 'Photos': ['photo'], 'Moves': ['move', 'Pending check', 'Guide bike', 'Priority'] };
 function renderHistory_() {
   var r = histData, s = r.summary, h = '';
   if (s.problem && roleRank_(role) >= 1) h += '<div class="hprob">\u2691 <b>Problem bike</b> \u2014 ' + s.problem + '. Fix it properly, or time to retire it?</div>';
@@ -1381,7 +1455,7 @@ function renderHistory_() {
   if (extras.length) h += '<p class="note" style="margin-top:10px">' + extras.join(' \u00b7 ') + '</p>';
   h += '<div class="chips" id="h-filters" style="margin-top:12px"></div>';
   var f = HIST_FILTERS[histFilter];
-  var list = r.events.filter(function(e){ return !f || f.indexOf(e.type) !== -1 || (e.action && f.indexOf(e.action) !== -1); });
+  var list = r.events.filter(function(e){ return !f || f.indexOf(e.type) !== -1 || (e.action && f.indexOf(e.action) !== -1) || (e.photo && f.indexOf('photo') !== -1); });
   h += list.slice(0, histShown).map(histEvHtml_).join('') || '<p class="note">Nothing recorded here yet.</p>';
   if (list.length > histShown) h += '<button class="quiet" style="width:100%;margin-top:10px" onclick="histShown+=30;renderHistory_()">Show older (' + (list.length - histShown) + ' more)</button>';
   document.getElementById('h-body').innerHTML = h;
@@ -1438,6 +1512,185 @@ function renderHpick_() {
     ? '<h2 style="color:var(--red)">\u2691 Problem bikes (' + probs.length + ')</h2>' +
       probs.map(function(b){ return hpRow_(b, '<span style="color:var(--red)">' + b.problem + '</span>'); }).join('')
     : '';
+}
+
+/* ---- Photos, heads-up notes, report a bike problem (B45) ---- */
+var photoBuf = { rp: '', f: '', j: '' };
+function shrinkPhoto_(input, done) {
+  var f = input.files && input.files[0];
+  input.value = '';
+  if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function() {
+    var img = new Image();
+    img.onload = function() {
+      var max = 1024, w = img.width, h = img.height;
+      if (w >= h && w > max) { h = Math.round(h * max / w); w = max; }
+      else if (h > w && h > max) { w = Math.round(w * max / h); h = max; }
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      done(c.toDataURL('image/jpeg', 0.72).split(',')[1]);
+    };
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+}
+function photoPicked_(key, input) {
+  shrinkPhoto_(input, function(b64){ photoBuf[key] = b64; paintPhotoNote_(key); });
+}
+function paintPhotoNote_(key) {
+  var n = document.getElementById(key + '-photo-note');
+  if (n) n.innerHTML = photoBuf[key]
+    ? '\u2713 Photo attached \u00b7 <a href="#" onclick="photoBuf.' + key + '=\'\';paintPhotoNote_(\'' + key + '\');return false">remove</a>' : '';
+}
+function escH_(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function thumb_(url) {
+  var m = String(url || '').match(/\/d\/([\w-]+)/);
+  if (!m) return '';
+  return '<a class="thumb" href="' + escH_(url) + '" target="_blank" rel="noopener"><img src="https://drive.google.com/thumbnail?id=' + m[1] +
+    '&sz=w280" alt="photo" loading="lazy"></a>';
+}
+function notesFor_(aid) { return (DB.notes || []).filter(function(n){ return n.assetId === aid; }); }
+function syncNotes_(r) {
+  if (!r || !r.bike || !r.notes) return;
+  var aid = r.bike.assetId;
+  DB.notes = (DB.notes || []).filter(function(n){ return n.assetId !== aid; }).concat(r.notes);
+}
+function canClearNote_(n) { return roleRank_(role) >= 1 || n.by === user; }
+function headsHtml_(aid, actions) {
+  return notesFor_(aid).map(function(n){
+    var btns = '';
+    if (actions) btns = '<div class="hb">' +
+      (canClearNote_(n) ? '<button class="quiet" onclick="clearNote_(' + n.row + ', false)">Clear &mdash; sorted</button>' : '') +
+      '<button class="quiet" onclick="clearNote_(' + n.row + ', true)">It&rsquo;s now a fault</button></div>';
+    return '<div class="heads"><b>\u26a0 Heads-up</b> \u2014 ' + escH_(n.note) +
+      '<div class="m">' + [escH_(n.by), fmtWhen_(n.when)].filter(Boolean).join(' \u00b7 ') + '</div>' + thumb_(n.photo) + btns + '</div>';
+  }).join('');
+}
+function headsLine_(aid) {
+  var nn = notesFor_(aid);
+  return nn.length ? '<div class="meta" style="color:#8A6510">\u26a0 Heads-up: ' + nn.map(function(n){ return escH_(n.note); }).join(' \u00b7 ') + '</div>' : '';
+}
+function paintHeads_() {
+  if (!current.bike) return;
+  var aid = current.bike.assetId;
+  ['b-heads', 'j-heads', 'rp-heads'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = headsHtml_(aid, true);
+  });
+  var bf = document.getElementById('b-faults');
+  if (bf && current.faults) renderFaults_('b-faults', current.faults, false);
+  var rf = document.getElementById('rp-faults');
+  if (rf) renderFaults_('rp-faults', faultsFor_(aid), false);
+}
+function clearNote_(row, toFault) {
+  var n = null;
+  (DB.notes || []).some(function(x){ if (x.row === row) { n = x; return true; } });
+  if (!n) return;
+  NOTE_CALL({ row: row, assetId: n.assetId, toFault: !!toFault }, function(r){
+    if (!r || (r.error && !r.denied)) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); return; }
+    if (r.denied) { toast('Only the workshop, or whoever added it, can clear a heads-up', true); return; }
+    DB.notes = (DB.notes || []).filter(function(x){ return x.row !== row; });
+    if (toFault) {
+      var f = { assetId: n.assetId, fault: n.note, by: user, when: new Date().toISOString(), photo: n.photo || '' };
+      DB.faults = DB.faults || [];
+      DB.faults.unshift(f);
+      if (current.faults && current.bike && current.bike.assetId === n.assetId) current.faults.unshift(f);
+    }
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast(toFault ? n.assetId + ' \u2014 logged as a fault for the workshop' : 'Heads-up cleared');
+    paintHeads_();
+  }, function(){ toast('Save failed \u2014 check signal', true); });
+}
+
+var rp = { bike: null, sel: [], ride: '' };
+var RP_RIDE = [['fine', 'Yes \u2014 rides fine, just be aware'], ['soon', 'Yes \u2014 but needs fixing soon'], ['no', 'No \u2014 don\u2019t ride it']];
+var RP_WHAT = {
+  fine: 'Saved as a <b>heads-up</b>. The bike stays Ready to ride, and guides see the note when they scan it out.',
+  soon: 'Logged as a <b>fault</b> for the workshop. The bike stays Ready to ride until it\u2019s fixed.',
+  no: 'Logged as a <b>fault</b> and the bike goes to <b>Pending check</b> \u2014 it can\u2019t go out on a tour.'
+};
+function rpReset_() {
+  rp = { bike: null, sel: [], ride: '' };
+  photoBuf.rp = ''; paintPhotoNote_('rp');
+  document.getElementById('rp-q').value = '';
+  document.getElementById('rp-res').innerHTML = '';
+  document.getElementById('rp-find').style.display = '';
+  document.getElementById('rp-form').style.display = 'none';
+}
+function rpSearch_() {
+  var q = document.getElementById('rp-q').value.trim(), nq = normCode_(q), box = document.getElementById('rp-res');
+  if (q.length < 2 || !nq) { box.innerHTML = ''; return; }
+  var hits = (DB.bikes || []).filter(function(b){
+    return b.active !== 'No' && (normCode_(b.assetId).indexOf(nq) !== -1 || String(b.barcode || '').indexOf(q) === 0);
+  }).slice(0, 10);
+  box.innerHTML = hits.length
+    ? hits.map(function(b){
+        return '<div class="mres" onclick="rpPickAid_(\'' + jsq_(b.assetId) + '\')"><span><b>' + b.assetId + '</b></span>' +
+          '<span class="mr-meta">' + (STATUS_LABELS[b.status] || b.status || '') + (b.location ? ' &middot; ' + b.location : '') + '</span></div>';
+      }).join('')
+    : '<p class="note">No bike matches &ldquo;' + escH_(q) + '&rdquo;.</p>';
+}
+function rpPickAid_(aid) {
+  var b = null;
+  (DB.bikes || []).some(function(x){ if (x.assetId === aid) { b = x; return true; } });
+  if (b) rpPick_(b);
+}
+function rpPick_(b) {
+  rp = { bike: b, sel: [], ride: '' };
+  current.bike = b; current.faults = null;
+  photoBuf.rp = ''; paintPhotoNote_('rp');
+  document.getElementById('rp-num').textContent = b.assetId;
+  document.getElementById('rp-meta').textContent = [STATUS_LABELS[b.status] || b.status, b.location].filter(Boolean).join(' \u00b7 ');
+  document.getElementById('rp-heads').innerHTML = headsHtml_(b.assetId, true);
+  renderFaults_('rp-faults', faultsFor_(b.assetId), false);
+  multiChips('rp-chips', FAULT_CHIPS, function(sel){ rp.sel = sel; rpPaint_(); });
+  document.getElementById('rp-text').value = '';
+  document.getElementById('rp-find').style.display = 'none';
+  document.getElementById('rp-form').style.display = '';
+  rpPaint_();
+  show('view-rp');
+}
+function rpText_() {
+  var t = document.getElementById('rp-text').value.trim(), p = rp.sel.slice();
+  if (t) p.push(t);
+  return p.join(' \u2014 ');
+}
+function rpPaint_() {
+  var txt = rpText_(), locked = RIDE_LOCK_RE.test(txt);
+  if (locked) rp.ride = 'no';
+  pendChips_('rp-ride', locked ? RP_RIDE.filter(function(o){ return o[0] === 'no'; }) : RP_RIDE, rp.ride,
+    function(v){ rp.ride = v; rpPaint_(); });
+  document.getElementById('rp-lock').style.display = locked ? '' : 'none';
+  document.getElementById('rp-what').innerHTML = rp.ride ? RP_WHAT[rp.ride] : '';
+  document.getElementById('rp-send').disabled = !(txt && rp.ride);
+}
+function rpSend_() {
+  var txt = rpText_(), b = rp.bike, ride = rp.ride;
+  if (!b || !txt || !ride) return;
+  var btn = document.getElementById('rp-send');
+  btn.disabled = true; btn.textContent = photoBuf.rp ? 'Sending photo\u2026' : 'Sending\u2026';
+  PROBLEM_CALL({ code: b.barcode || b.assetId, fault: txt, ride: ride, photo: photoBuf.rp || '' }, function(r){
+    btn.textContent = 'Send';
+    if (r && r.notFound) { toast('Bike not found \u2014 pick it again', true); rpReset_(); return; }
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); rpPaint_(); return; }
+    var now = new Date().toISOString();
+    if (r.kind === 'note') {
+      DB.notes = DB.notes || [];
+      DB.notes.push({ row: r.row, assetId: r.assetId, note: txt, by: user, when: now, photo: r.photo || '' });
+      toast(r.assetId + ' \u2014 heads-up saved');
+    } else {
+      DB.faults = DB.faults || [];
+      DB.faults.unshift({ assetId: r.assetId, fault: txt, by: user, when: now, photo: r.photo || '' });
+      if (r.newStatus) { b.status = r.newStatus; b.statusChanged = now; }
+      if (r.ride === 'no' && (b.status === 'Pending' || b.status === 'On tour')) b.pendRide = 'No';
+      toast(r.assetId + (r.ride === 'no' ? ' \u2014 fault logged, bike on Pending check' : ' \u2014 fault logged for the workshop'));
+    }
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    photoBuf.rp = '';
+    go('home');
+  }, function(){ btn.textContent = 'Send'; toast('Save failed \u2014 check signal', true); rpPaint_(); });
 }
 
 function renderGreet_() {
@@ -1542,6 +1795,9 @@ function go(view) {
   } else if (view === 'gtask') {
     openGtask_();
     show('view-gtask');
+  } else if (view === 'rp') {
+    rpReset_();
+    show('view-rp');
   } else if (view === 'hpick') {
     renderHpick_();
     show('view-hpick');
@@ -1593,7 +1849,7 @@ function go(view) {
   } else if (view === 'tour-in') {
     renderTourIn_();
     show('view-tourin');
-  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in-scan' || view === 'move-scan' || view === 'hist-scan') {
+  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in-scan' || view === 'move-scan' || view === 'hist-scan' || view === 'rp-scan') {
     mode = (view === 'tour-in-scan') ? 'tour-in' : view;
     document.getElementById('scan-title').textContent =
       view === 'assign' ? 'Scan the sticker on the bike'
@@ -1601,7 +1857,8 @@ function go(view) {
       : view === 'tour-out' ? 'Scan each bike going on tour \u2014 ' + tourLoc
       : view === 'tour-in-scan' ? 'Scan each bike coming back to ' + tourLoc
       : view === 'move-scan' ? 'Scan each bike going to ' + mvLoc
-      : view === 'hist-scan' ? 'Scan a bike to see its history' : 'Scan a bike';
+      : view === 'hist-scan' ? 'Scan a bike to see its history'
+      : view === 'rp-scan' ? 'Scan the bike with the problem' : 'Scan a bike';
     document.getElementById('manual').value = '';
     var mr = document.getElementById('m-results'); if (mr) mr.innerHTML = '';
     var sb = document.getElementById('snapbtn');
@@ -1753,7 +2010,7 @@ function renderWq_() {
         ragDot_(p, isAdmin ? 'cycleBikePrio_(\'' + jsq_(b.assetId) + '\')' : '') +
         '<div onclick="wqOpen_(\'' + jsq_(code) + '\')" style="cursor:pointer"><b>' + b.assetId + '</b> \u00b7 ' +
         KIND[it.k][1] + auto + '<div class="meta">' + (b.location || '?') + (t ? ' \u00b7 ' + t : '') + '</div>' + pendTag_(b) + problemTag_(b) +
-        extra + faultLine_(b.assetId) + '</div></div>';
+        extra + faultLine_(b.assetId) + headsLine_(b.assetId) + '</div></div>';
     });
   });
   if (!items.length) h += '<p class="note">Nothing needs attention \u2014 clean bench.</p>';
@@ -1849,7 +2106,7 @@ function wqOpen_(code) {
   current.code = code;
   LOOKUP_CALL(code, function(r){
     if (r.notFound) { toast('Bike not found', true); return; }
-    openJob(r.bike, r.history, r.faults);
+    syncNotes_(r); openJob(r.bike, r.history, r.faults);
   }, function(){ toast('Lookup failed \u2014 check signal', true); });
 }
 /* ---- Optional bike on workshop tasks (B27) ---- */
@@ -2071,11 +2328,19 @@ function onCode(code) {
         }
       });
       try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+      if (dir === 'out') {
+        var hn = notesFor_(r.assetId);
+        if (hn.length) alert('\u26a0 Heads-up on ' + r.assetId + ':\n\n' + hn.map(function(n){ return '\u2022 ' + n.note; }).join('\n'));
+      }
       tourSession.push(r.assetId);
       if (!(dir === 'in' && wasOut && celebrateHome_(guidesAllHome_([wasOut.guide]))))
         toast(r.assetId + (dir === 'out' ? ' \u2014 out at ' + tourLoc + ' (' + tourSession.length + ')' : ' \u2014 back in at ' + tourLoc));
       goTour_();            // straight back to the scanner \u2014 next bike
     }, function(){ toast('Save failed \u2014 check signal', true); goTour_(); });
+  } else if (mode === 'rp-scan') {
+    var rb = findBikeLocal_(code);
+    if (!rb) { toast('No bike carries ' + code + ' \u2014 try the name', true); go('rp-scan'); return; }
+    rpPick_(rb);
   } else if (mode === 'hist-scan') {
     var hb = findBikeLocal_(code);
     if (!hb) { toast('No bike carries ' + code + ' \u2014 try the name', true); go('hist-scan'); return; }
@@ -2095,7 +2360,7 @@ function onCode(code) {
   } else if (mode === 'workshop') {
     var onFound = function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet — assign it first', true); go('workshop'); return; }
-      openJob(r.bike, r.history, r.faults);
+      syncNotes_(r); openJob(r.bike, r.history, r.faults);
     };
     var onErr = function(){ toast('Lookup failed — check signal', true); go('workshop'); };
     LOOKUP_CALL(code, onFound, onErr);
@@ -2103,7 +2368,7 @@ function onCode(code) {
     apiPost({ action: 'lookup', barcode: code }, function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet', true); go('lookup'); return; }
       bikeFrom = 'lookup';
-      openBike(r.bike, r.faults);
+      syncNotes_(r); openBike(r.bike, r.faults);
     }, function(e){ toast('Save failed — check signal', true); go('lookup'); });
   }
 }
@@ -2166,7 +2431,7 @@ function renderFaults_(id, faults, forWorkshop) {
   (faults || []).forEach(function(f){
     h += '<div class="fault"><b>' + f.fault + '</b><div class="m">' +
          [f.by, fmtDate_(f.when), openDays_(f.when)].filter(Boolean).join(' · ') +
-         (forWorkshop ? ' · clears when a job sets it Ready to ride' : '') + '</div></div>';
+         (forWorkshop ? ' · clears when a job sets it Ready to ride' : '') + '</div>' + thumb_(f.photo) + '</div>';
   });
   el.innerHTML = h;
 }
@@ -2177,12 +2442,15 @@ function sendFault() {
   var fault = parts.join(' — ');
   if (!fault) { toast('Tap a fault type or describe it first', true); return; }
   document.getElementById('f-send').disabled = true;
-  FAULT_CALL({ barcode: current.code, fault: fault, user: user }, function(r){
+  FAULT_CALL({ barcode: current.code, fault: fault, user: user, photo: photoBuf.f || '' }, function(r){
     document.getElementById('f-send').disabled = false;
     if (r.notFound) { toast('Bike not found — rescan', true); return; }
     toast(r.assetId + ' — fault logged for the workshop');
     current.faults = (current.faults || []);
-    current.faults.unshift({ fault: fault, by: user, when: new Date().toISOString() });
+    var nf = { assetId: r.assetId, fault: fault, by: user, when: new Date().toISOString(), photo: r.photo || '' };
+    current.faults.unshift(nf);
+    DB.faults = DB.faults || []; DB.faults.unshift(nf);
+    photoBuf.f = ''; paintPhotoNote_('f');
     renderFaults_('b-faults', current.faults, false);
     document.getElementById('f-text').value = '';
     faultSel = [];
@@ -2220,7 +2488,7 @@ function openBikeByBarcode(bc, from) {
   current.code = bc;
   LOOKUP_CALL(bc, function(r){
     if (r.notFound) { toast('Bike not found', true); return; }
-    openBike(r.bike, r.faults);
+    syncNotes_(r); openBike(r.bike, r.faults);
   }, function(){ toast('Lookup failed — check signal', true); });
 }
 function openBike(b, faults) {
@@ -2228,6 +2496,8 @@ function openBike(b, faults) {
   current.faults = faults || [];
   current.pendRide = b.pendRide || ''; current.pendBy = b.pendBy || ''; current.gbWho = b.guideHolder || '';
   renderFaults_('b-faults', current.faults, false);
+  document.getElementById('b-heads').innerHTML = headsHtml_(b.assetId, true);
+  photoBuf.f = ''; paintPhotoNote_('f');
   faultSel = [];
   multiChips('f-chips', FAULT_CHIPS, function(sel){ faultSel = sel; });
   document.getElementById('f-text').value = '';
@@ -2609,6 +2879,8 @@ function openJob(b, hist) {
   document.getElementById('j-parts').value = '';
   document.getElementById('j-service').checked = false;
   document.getElementById('j-partneed').value = '';
+  document.getElementById('j-heads').innerHTML = headsHtml_(b.assetId, true);
+  photoBuf.j = ''; paintPhotoNote_('j');
   document.getElementById('j-partneed-wrap').style.display = 'none';
 
   multiChips('j-work', JOB_WORK, function(sel){
@@ -2674,7 +2946,7 @@ function saveJob() {
   document.getElementById('j-save').disabled = true;
   JOB_CALL({
     barcode: current.code, work: work, minutes: job.mins, parts: parts.join(', '),
-    outcome: job.outcome, isService: isService, user: user,
+    outcome: job.outcome, isService: isService, user: user, photo: photoBuf.j || '',
     partsNeeded: document.getElementById('j-partneed').value.trim()
   }, function(r){
     if (r.denied) { toast('Workshop PIN needed \u2014 unlock on the home screen', true); jobSaveState(); return; }
@@ -2713,6 +2985,8 @@ function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, u
 function PARTSDONE_CALL(rows, ok, err) { apiPost({ action: 'partsdone', rows: rows, user: user, pin: pin }, ok, err); }
 function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (staffCheck_()) return; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
+function PROBLEM_CALL(p, ok, err) { p.action = 'problem'; p.user = user; apiPost(p, ok, err); }
+function NOTE_CALL(p, ok, err) { apiPost({ action: 'clearnote', row: p.row, assetId: p.assetId, toFault: !!p.toFault, user: user, pin: pin }, ok, err); }
 
 /* ---------- tour hub ---------- */
 var tourSession = [];
