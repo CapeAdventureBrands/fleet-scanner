@@ -600,7 +600,7 @@
 
   <!-- REPORT A BIKE PROBLEM (B45) -->
   <section id="view-rp" class="hidden">
-    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <button class="back" onclick="rpExit_()">&#8249; Back</button>
     <h2>Report a bike problem</h2>
     <div id="rp-find">
       <div class="manual" style="margin-top:6px">
@@ -625,7 +625,7 @@
       <p class="note" id="rp-lock" style="display:none;color:var(--red);margin:6px 0 0">Brakes or steering &mdash; it can&rsquo;t go out until the workshop has checked it.</p>
       <p class="note" id="rp-what" style="margin-top:8px"></p>
       <div class="bar">
-        <button class="quiet" onclick="go('home')">Cancel</button>
+        <button class="quiet" onclick="rpExit_()">Cancel</button>
         <button class="primary" id="rp-send" onclick="rpSend_()" disabled>Send</button>
       </div>
     </div>
@@ -720,13 +720,7 @@
     <div id="b-setupbox"></div>
     <div id="b-heads"></div>
     <div id="b-faults"></div>
-    <h2>Report a fault</h2>
-    <div class="chips" id="f-chips"></div>
-    <input type="text" id="f-text" placeholder="What's wrong? (add detail)" style="margin-top:10px" autocomplete="off">
-    <input type="file" id="f-photo" accept="image/*" multiple class="hidden" onchange="photoPicked_('f', this)">
-    <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('f-photo').click()">&#128247; Add photos (optional, up to 4)</button>
-    <p class="note" id="f-photo-note"></p>
-    <button class="quiet" style="width:100%;margin-top:10px" id="f-send" onclick="sendFault()">Log fault for the workshop</button>
+    <button class="quiet" style="width:100%;margin-top:14px;border-color:var(--red);color:var(--red);font-weight:600" onclick="rpOpenFor_()">&#9888; Report a problem with this bike</button>
     <h2>Move to</h2>
     <div class="chips" id="locs"></div>
     <h2>Set status</h2>
@@ -753,7 +747,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycby-9U7R9I1gcjEXtYibVxItPuQ60yXaxTU0trf9oKnejFyefd5jtkCKml72AmNM8HWR/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbypy04WD42QXo-4cTJZncckbSoxYFQrxhZqvFT253I-cVo6fd8lybrAFZep2s5X7qmU/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -766,7 +760,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B49';
+var UI_VERSION = 'B51';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -1738,6 +1732,23 @@ function rpPaint_() {
   document.getElementById('rp-what').innerHTML = rp.ride ? RP_WHAT[rp.ride] : '';
   document.getElementById('rp-send').disabled = !(txt && rp.ride);
 }
+var rpFrom = '';
+function rpOpenFor_() {
+  if (!current.bike) return;
+  var b = current.bike;
+  rpReset_();
+  rpPick_(b);
+  rpFrom = 'bike';
+}
+function rpExit_() {
+  if (rpFrom === 'bike' && current.bike) {
+    rpFrom = '';
+    openBike(current.bike, faultsFor_(current.bike.assetId));
+    return;
+  }
+  rpFrom = '';
+  go('home');
+}
 function rpSend_() {
   var txt = rpText_(), b = rp.bike, ride = rp.ride;
   if (!b || !txt || !ride) return;
@@ -1748,20 +1759,25 @@ function rpSend_() {
     if (r && r.notFound) { toast('Bike not found \u2014 pick it again', true); rpReset_(); return; }
     if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); rpPaint_(); return; }
     var now = new Date().toISOString();
-    if (r.kind === 'note') {
+    if (r.newStatus) {
+      b.status = r.newStatus; b.statusChanged = now;
+      (DB.bikes || []).forEach(function(x){ if (x.assetId === r.assetId) { x.status = r.newStatus; x.statusChanged = now; } });
+    }
+    if (r.duplicate) {
+      toast(r.assetId + ' \u2014 already logged in the last 30 minutes \u2713 (not added twice)');
+    } else if (r.kind === 'note') {
       DB.notes = DB.notes || [];
       DB.notes.push({ row: r.row, assetId: r.assetId, note: txt, by: user, when: now, photo: r.photo || '' });
       toast(r.assetId + ' \u2014 heads-up saved');
     } else {
       DB.faults = DB.faults || [];
       DB.faults.unshift({ assetId: r.assetId, fault: txt, by: user, when: now, photo: r.photo || '' });
-      if (r.newStatus) { b.status = r.newStatus; b.statusChanged = now; }
       if (r.ride === 'no' && (b.status === 'Pending' || b.status === 'On tour')) b.pendRide = 'No';
       toast(r.assetId + (r.ride === 'no' ? ' \u2014 fault logged, bike on Pending check' : ' \u2014 fault logged for the workshop'));
     }
     try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
     photoBuf.rp = '';
-    go('home');
+    rpExit_();
   }, function(){ btn.textContent = 'Send'; toast('Save failed \u2014 check signal', true); rpPaint_(); });
 }
 
@@ -2037,6 +2053,7 @@ function go(view) {
     renderStock_();
     show('view-stock');
   } else if (view === 'rp') {
+    rpFrom = '';
     rpReset_();
     show('view-rp');
   } else if (view === 'hpick') {
@@ -2061,6 +2078,10 @@ function go(view) {
   } else if (view === 'wq') {
     renderWq_();
     show('view-wq');
+    REFRESH_DATA(function(){
+      try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+      var v = document.getElementById('view-wq'); if (v && !v.classList.contains('hidden')) renderWq_();
+    });
   } else if (view === 'wtasks') {
     renderWtasks_();
     show('view-wtasks');
@@ -2738,10 +2759,6 @@ function openBike(b, faults) {
   current.pendRide = b.pendRide || ''; current.pendBy = b.pendBy || ''; current.gbWho = b.guideHolder || '';
   renderFaults_('b-faults', current.faults, false);
   document.getElementById('b-heads').innerHTML = headsHtml_(b.assetId, true);
-  photoBuf.f = ''; paintPhotoNote_('f');
-  faultSel = [];
-  multiChips('f-chips', FAULT_CHIPS, function(sel){ faultSel = sel; });
-  document.getElementById('f-text').value = '';
   document.getElementById('b-num').textContent = b.assetId;
   paintBikeMeta_(b);
   setupEdit = {}; paintSetup_('b-setupbox');
