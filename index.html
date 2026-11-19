@@ -210,7 +210,8 @@
   .heads .m { font-size:12px; color:#8A6510; margin-top:2px; }
   .heads .hb { display:flex; gap:8px; margin-top:8px; }
   .heads .hb button { flex:1; margin:0; padding:8px 6px; font-size:13px; }
-  a.thumb { display:inline-block; margin-top:6px; }
+  .thumbs { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  a.thumb { display:inline-block; }
   a.thumb img { max-width:140px; max-height:140px; border-radius:6px; display:block; border:1px solid var(--line); }
   #rp-res .mres { display:flex; justify-content:space-between; gap:10px; align-items:center;
     padding:10px 4px; border-bottom:1px solid var(--line); font-size:14px; cursor:pointer; }
@@ -420,6 +421,7 @@
           <div class="fact"><div class="v" id="j-wheel"></div><div class="k">Wheel</div></div>
           <div class="fact" style="grid-column:1 / -1"><div class="v" id="j-lastserv"></div><div class="k">Last service</div></div>
         </div>
+        <div id="j-setupbox"></div>
         <div id="j-heads"></div>
         <div id="j-faults"></div>
         <div id="j-hist"></div>
@@ -436,8 +438,8 @@
     <div class="chips" id="j-parts-chips"></div>
     <input type="text" id="j-parts" placeholder="Other parts (optional)" style="margin-top:10px" autocomplete="off">
     <h2>Photo</h2>
-    <input type="file" id="j-photo" accept="image/*" class="hidden" onchange="photoPicked_('j', this)">
-    <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('j-photo').click()">&#128247; Add a photo (optional) &mdash; damage, serial, before/after</button>
+    <input type="file" id="j-photo" accept="image/*" multiple class="hidden" onchange="photoPicked_('j', this)">
+    <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('j-photo').click()">&#128247; Add photos (optional, up to 4) &mdash; damage, serial, before/after</button>
     <p class="note" id="j-photo-note"></p>
     <h2>Where does it stand now?</h2>
     <div class="chips" id="j-outcome"></div>
@@ -591,8 +593,8 @@
       <h2>What&rsquo;s wrong?</h2>
       <div class="chips" id="rp-chips"></div>
       <input type="text" id="rp-text" placeholder="Describe it &mdash; e.g. screen connector comes loose" style="margin-top:10px" autocomplete="off" oninput="rpPaint_()">
-    <input type="file" id="rp-photo" accept="image/*" class="hidden" onchange="photoPicked_('rp', this)">
-    <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('rp-photo').click()">&#128247; Add a photo (optional)</button>
+    <input type="file" id="rp-photo" accept="image/*" multiple class="hidden" onchange="photoPicked_('rp', this)">
+    <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('rp-photo').click()">&#128247; Add photos (optional, up to 4)</button>
     <p class="note" id="rp-photo-note"></p>
       <h2>Can it still be ridden?</h2>
       <div class="chips" id="rp-ride"></div>
@@ -664,13 +666,14 @@
       </div>
     </div>
     <button class="quiet" style="width:100%;margin-top:10px" onclick="openHistory_('view-bike')">&#128214; Bike history</button>
+    <div id="b-setupbox"></div>
     <div id="b-heads"></div>
     <div id="b-faults"></div>
     <h2>Report a fault</h2>
     <div class="chips" id="f-chips"></div>
     <input type="text" id="f-text" placeholder="What's wrong? (add detail)" style="margin-top:10px" autocomplete="off">
-    <input type="file" id="f-photo" accept="image/*" class="hidden" onchange="photoPicked_('f', this)">
-    <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('f-photo').click()">&#128247; Add a photo (optional)</button>
+    <input type="file" id="f-photo" accept="image/*" multiple class="hidden" onchange="photoPicked_('f', this)">
+    <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('f-photo').click()">&#128247; Add photos (optional, up to 4)</button>
     <p class="note" id="f-photo-note"></p>
     <button class="quiet" style="width:100%;margin-top:10px" id="f-send" onclick="sendFault()">Log fault for the workshop</button>
     <h2>Move to</h2>
@@ -699,7 +702,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbweFxJgtFWhlP5QMIpum8eLINiWyQlqcA4rYKJvTQWy5T_bvFPp8TRkqx6OVLx9VgDV/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxsFn3K78cbuEXrMjSBHjKhq1RF45kXZ8Lyj52zrTArgT5uSHwd5g_OxBw_wc4LC-Ef/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -712,7 +715,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B45';
+var UI_VERSION = 'B47';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -1433,13 +1436,13 @@ function histEvHtml_(e) {
     title = '<b>Moved</b> \u00b7 ' + moveText_(e.detail);
     meta += e.by ? ' \u00b7 ' + e.by : '';
   } else {
-    ic = e.action === 'Quick fix' ? '\u2705' : e.action === 'Pending check' ? '\u23f8\ufe0f' : e.action === 'Guide bike' ? '\ud83d\udeb2' : '\ud83c\udff7';
+    ic = e.action === 'Setup' ? '\u2699\ufe0f' : e.action === 'Quick fix' ? '\u2705' : e.action === 'Pending check' ? '\u23f8\ufe0f' : e.action === 'Guide bike' ? '\ud83d\udeb2' : '\ud83c\udff7';
     title = '<b>' + e.action + '</b> \u00b7 ' + String(e.detail || '').replace(/\d{4}-\d{2}-\d{2}/g, function(x){ return niceDay_(x); });
     meta += e.by ? ' \u00b7 ' + e.by : '';
   }
   return '<div class="hev"><div class="ic">' + ic + '</div><div><div>' + title + '</div><div class="hm">' + meta + '</div>' + thumb_(e.photo) + '</div></div>';
 }
-var HIST_FILTERS = { 'All': null, 'Tours': ['tour'], 'Workshop': ['job', 'part', 'Quick fix'], 'Faults': ['fault', 'note'], 'Photos': ['photo'], 'Moves': ['move', 'Pending check', 'Guide bike', 'Priority'] };
+var HIST_FILTERS = { 'All': null, 'Tours': ['tour'], 'Workshop': ['job', 'part', 'Quick fix', 'Setup'], 'Faults': ['fault', 'note'], 'Photos': ['photo'], 'Moves': ['move', 'Pending check', 'Guide bike', 'Priority'] };
 function renderHistory_() {
   var r = histData, s = r.summary, h = '';
   if (s.problem && roleRank_(role) >= 1) h += '<div class="hprob">\u2691 <b>Problem bike</b> \u2014 ' + s.problem + '. Fix it properly, or time to retire it?</div>';
@@ -1516,10 +1519,10 @@ function renderHpick_() {
 
 /* ---- Photos, heads-up notes, report a bike problem (B45) ---- */
 var photoBuf = { rp: '', f: '', j: '' };
-function shrinkPhoto_(input, done) {
-  var f = input.files && input.files[0];
-  input.value = '';
-  if (!f) return;
+var MAX_PHOTOS = 4;
+function photoList_(key) { return String(photoBuf[key] || '').split('|').filter(Boolean); }
+function shrinkPhoto_(f, done) {
+  if (!f) { done(''); return; }
   var rd = new FileReader();
   rd.onload = function() {
     var img = new Image();
@@ -1537,19 +1540,35 @@ function shrinkPhoto_(input, done) {
   rd.readAsDataURL(f);
 }
 function photoPicked_(key, input) {
-  shrinkPhoto_(input, function(b64){ photoBuf[key] = b64; paintPhotoNote_(key); });
+  var files = [].slice.call(input.files || []);
+  input.value = '';
+  var have = photoList_(key), room = MAX_PHOTOS - have.length;
+  if (files.length > room) toast(room > 0 ? 'Only ' + MAX_PHOTOS + ' photos per report \u2014 added the first ' + room : 'Already ' + MAX_PHOTOS + ' photos \u2014 remove some first', true);
+  files = files.slice(0, Math.max(0, room));
+  var n = document.getElementById(key + '-photo-note');
+  if (files.length && n) n.textContent = 'Preparing ' + files.length + ' photo' + (files.length > 1 ? 's' : '') + '\u2026';
+  (function next() {
+    if (!files.length) { paintPhotoNote_(key); return; }
+    shrinkPhoto_(files.shift(), function(b64){
+      if (b64) { var l = photoList_(key); l.push(b64); photoBuf[key] = l.join('|'); }
+      next();
+    });
+  })();
 }
 function paintPhotoNote_(key) {
-  var n = document.getElementById(key + '-photo-note');
-  if (n) n.innerHTML = photoBuf[key]
-    ? '\u2713 Photo attached \u00b7 <a href="#" onclick="photoBuf.' + key + '=\'\';paintPhotoNote_(\'' + key + '\');return false">remove</a>' : '';
+  var n = document.getElementById(key + '-photo-note'), c = photoList_(key).length;
+  if (n) n.innerHTML = c
+    ? '\u2713 ' + c + ' photo' + (c > 1 ? 's' : '') + ' attached' + (c < MAX_PHOTOS ? ' \u00b7 tap the button to add more' : '') +
+      ' \u00b7 <a href="#" onclick="photoBuf.' + key + '=\'\';paintPhotoNote_(\'' + key + '\');return false">remove' + (c > 1 ? ' all' : '') + '</a>' : '';
 }
 function escH_(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function thumb_(url) {
-  var m = String(url || '').match(/\/d\/([\w-]+)/);
-  if (!m) return '';
-  return '<a class="thumb" href="' + escH_(url) + '" target="_blank" rel="noopener"><img src="https://drive.google.com/thumbnail?id=' + m[1] +
-    '&sz=w280" alt="photo" loading="lazy"></a>';
+function thumb_(urls) {
+  var h = String(urls || '').split(/\s+/).map(function(url){
+    var m = url.match(/\/d\/([\w-]+)/);
+    return m ? '<a class="thumb" href="' + escH_(url) + '" target="_blank" rel="noopener"><img src="https://drive.google.com/thumbnail?id=' + m[1] +
+      '&sz=w280" alt="photo" loading="lazy"></a>' : '';
+  }).join('');
+  return h ? '<div class="thumbs">' + h + '</div>' : '';
 }
 function notesFor_(aid) { return (DB.notes || []).filter(function(n){ return n.assetId === aid; }); }
 function syncNotes_(r) {
@@ -1670,7 +1689,7 @@ function rpSend_() {
   var txt = rpText_(), b = rp.bike, ride = rp.ride;
   if (!b || !txt || !ride) return;
   var btn = document.getElementById('rp-send');
-  btn.disabled = true; btn.textContent = photoBuf.rp ? 'Sending photo\u2026' : 'Sending\u2026';
+  btn.disabled = true; btn.textContent = photoBuf.rp ? 'Sending photo' + (photoList_('rp').length > 1 ? 's' : '') + '\u2026' : 'Sending\u2026';
   PROBLEM_CALL({ code: b.barcode || b.assetId, fault: txt, ride: ride, photo: photoBuf.rp || '' }, function(r){
     btn.textContent = 'Send';
     if (r && r.notFound) { toast('Bike not found \u2014 pick it again', true); rpReset_(); return; }
@@ -1691,6 +1710,61 @@ function rpSend_() {
     photoBuf.rp = '';
     go('home');
   }, function(){ btn.textContent = 'Send'; toast('Save failed \u2014 check signal', true); rpPaint_(); });
+}
+
+/* ---- Gear setup (B47) ---- */
+var SETUP_GEARS = ['Single speed', '7', '8', '9', '10', '11', '12'];
+var setupEdit = {};
+function setupLabel_(b) {
+  var g = String((b && b.gears) || ''), r = String((b && b.rings) || '');
+  if (g === 'Single speed') return g;
+  if (g && r) return r + g;
+  return g ? g + '-speed' : r;
+}
+function paintSetup_(id) {
+  var box = document.getElementById(id), b = current.bike;
+  if (!box || !b) return;
+  if (roleRank_(role) < 1) { box.innerHTML = ''; return; }
+  var lab = setupLabel_(b);
+  if (!setupEdit.open) {
+    box.innerHTML = '<button class="quiet" style="width:100%;margin-top:10px" onclick="setupOpen_(\'' + id + '\')">\u2699\ufe0f Gears: <b>' +
+      (lab || 'not set') + '</b> \u2014 change</button>';
+    return;
+  }
+  box.innerHTML = '<div class="card" style="margin-top:10px"><b>Gear setup</b>' +
+    '<p class="note" style="margin:8px 0 4px">Gears at the back</p><div class="chips" id="' + id + '-g"></div>' +
+    '<p class="note" style="margin:10px 0 4px">Chainrings at the front</p><div class="chips" id="' + id + '-r"></div>' +
+    '<div class="bar"><button class="quiet" onclick="setupEdit={};paintSetup_(\'' + id + '\')">Cancel</button>' +
+    '<button class="primary" id="' + id + '-save" onclick="saveSetup_(\'' + id + '\')">Save</button></div></div>';
+  pendChips_(id + '-g', SETUP_GEARS.map(function(g){ return [g, g === 'Single speed' ? g : g + '-speed']; }), setupEdit.g,
+    function(v){ setupEdit.g = v; if (v === 'Single speed') setupEdit.r = '1x'; paintSetup_(id); });
+  pendChips_(id + '-r', setupEdit.g === 'Single speed' ? [['1x', '1x']] : [['1x', '1x'], ['2x', '2x'], ['3x', '3x']], setupEdit.r,
+    function(v){ setupEdit.r = v; paintSetup_(id); });
+  document.getElementById(id + '-save').disabled = !(setupEdit.g && setupEdit.r) ||
+    (setupEdit.g === b.gears && setupEdit.r === b.rings);
+}
+function setupOpen_(id) {
+  setupEdit = { open: true, g: current.bike.gears || '', r: current.bike.rings || '' };
+  paintSetup_(id);
+}
+function saveSetup_(id) {
+  var b = current.bike, btn = document.getElementById(id + '-save');
+  btn.disabled = true; btn.textContent = 'Saving\u2026';
+  SETUP_CALL({ code: b.barcode || b.assetId, gears: setupEdit.g, rings: setupEdit.r }, function(r){
+    if (r && r.denied) { toast('Only workshop or admin can change gear setup', true); setupEdit = {}; paintSetup_(id); return; }
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); btn.textContent = 'Save'; btn.disabled = false; return; }
+    b.gears = r.gears; b.rings = r.rings;
+    (DB.bikes || []).forEach(function(x){ if (x.assetId === r.assetId) { x.gears = r.gears; x.rings = r.rings; } });
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    setupEdit = {};
+    paintSetup_(id);
+    paintBikeMeta_(b);
+    toast(r.assetId + ' \u2014 gears set to ' + setupLabel_(b));
+  }, function(){ btn.textContent = 'Save'; btn.disabled = false; toast('Save failed \u2014 check signal', true); });
+}
+function paintBikeMeta_(b) {
+  var m = document.getElementById('b-meta');
+  if (m) m.textContent = [b.category, b.brand, b.frameSize, b.wheelSize, b.colour, setupLabel_(b)].filter(Boolean).join(' \u00b7 ');
 }
 
 function renderGreet_() {
@@ -2502,8 +2576,8 @@ function openBike(b, faults) {
   multiChips('f-chips', FAULT_CHIPS, function(sel){ faultSel = sel; });
   document.getElementById('f-text').value = '';
   document.getElementById('b-num').textContent = b.assetId;
-  document.getElementById('b-meta').textContent =
-    [b.category, b.brand, b.frameSize, b.wheelSize, b.colour].filter(Boolean).join(' · ');
+  paintBikeMeta_(b);
+  setupEdit = {}; paintSetup_('b-setupbox');
   document.getElementById('b-loc').textContent = b.location || '—';
   document.getElementById('b-status').textContent = statusPill_(b.status).label;
   chipRow('locs', DB.locations, b.location, function(v){ current.newLoc = v; updateSave(); });
@@ -2863,6 +2937,7 @@ function openJob(b, hist) {
   document.getElementById('j-loc').textContent = b.location || '\u2014';
   document.getElementById('j-type').textContent = b.category || '\u2014';
   document.getElementById('j-frame').textContent = b.frameSize || '\u2014';
+  setupEdit = {}; paintSetup_('j-setupbox');
   document.getElementById('j-wheel').textContent = b.wheelSize || '\u2014';
   document.getElementById('j-lastserv').textContent = fmtDate_(b.lastService);
 
@@ -2986,6 +3061,7 @@ function PARTSDONE_CALL(rows, ok, err) { apiPost({ action: 'partsdone', rows: ro
 function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (staffCheck_()) return; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
 function PROBLEM_CALL(p, ok, err) { p.action = 'problem'; p.user = user; apiPost(p, ok, err); }
+function SETUP_CALL(p, ok, err) { apiPost({ action: 'setup', code: p.code, gears: p.gears, rings: p.rings, user: user, pin: pin }, ok, err); }
 function NOTE_CALL(p, ok, err) { apiPost({ action: 'clearnote', row: p.row, assetId: p.assetId, toFault: !!p.toFault, user: user, pin: pin }, ok, err); }
 
 /* ---------- tour hub ---------- */
