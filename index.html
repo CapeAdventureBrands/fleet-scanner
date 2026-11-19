@@ -216,6 +216,22 @@
   #rp-res .mres { display:flex; justify-content:space-between; gap:10px; align-items:center;
     padding:10px 4px; border-bottom:1px solid var(--line); font-size:14px; cursor:pointer; }
   #rp-res .mr-meta { font-size:12px; color:var(--grey); text-align:right; flex-shrink:0; }
+  .stk { display:flex; align-items:center; gap:10px; padding:12px 2px; border-bottom:1px solid var(--line); }
+  .stk .nm { flex:1; font-size:15px; }
+  .stk .nm small { display:block; font-size:12px; color:var(--grey); }
+  .stk .step { display:flex; align-items:center; gap:4px; }
+  .stk .step button { width:38px; height:38px; margin:0; padding:0; font-size:20px; }
+  .stk .step input { width:48px; text-align:center; margin:0; padding:8px 2px; font-size:16px; }
+  .stk label.more { font-size:12px; display:flex; flex-direction:column; align-items:center; color:var(--red); min-width:48px; }
+  .stk label.more input { width:22px; height:22px; margin:0 0 2px; }
+  .fl { padding:12px 4px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .fl .t { display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+  .fl .t span { font-size:12px; color:var(--grey); text-align:right; flex-shrink:0; }
+  .fl .d { font-size:14px; margin-top:3px; }
+  .fl .m { font-size:12px; color:var(--grey); margin-top:3px; }
+  .fl.hu { border-left:4px solid #E0A800; padding-left:8px; }
+  .fl.ft { border-left:4px solid var(--red); padding-left:8px; }
+  .fl .new { background:var(--red); color:#fff; font-size:11px; padding:1px 6px; border-radius:8px; margin-left:6px; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -276,6 +292,10 @@
         <div class="big">Report a bike problem</div>
         <div class="sub">Something wrong, or worth knowing &mdash; add a photo</div>
       </button>
+      <button class="tile" onclick="go('flist')" id="tile-flist">
+        <div class="big">Faults &amp; heads-ups</div>
+        <div class="sub">Every open fault and heads-up &mdash; who logged it, when, photos</div>
+      </button>
       <button class="tile" onclick="go('mv')" id="tile-move">
         <div class="big">Move bikes</div>
         <div class="sub">Pick a site, then scan bike after bike &mdash; each scan moves one</div>
@@ -283,6 +303,10 @@
       <button class="tile" onclick="go('tour')" id="tile-tour">
         <div class="big">Tour bikes</div>
         <div class="sub">Scan bikes out for your tour &mdash; and back in after</div>
+      </button>
+      <button class="tile" onclick="go('stock')" id="tile-stock">
+        <div class="big">Snacks &amp; water count</div>
+        <div class="sub">End of the day &mdash; count what&rsquo;s left, tick what needs ordering</div>
       </button>
       <button class="tile" onclick="go('gd')" id="tile-gdash">
         <div class="big">Where are the bikes?</div>
@@ -607,6 +631,33 @@
     </div>
   </section>
 
+
+  <!-- SNACKS & WATER COUNT (B48) -->
+  <section id="view-stock" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Snacks &amp; water count</h2>
+    <p class="note">Count what&rsquo;s left at your site. Tick <b>Need more</b> for anything running low &mdash; the order is emailed straight away.</p>
+    <div class="chips" id="st-sites"></div>
+    <p class="note" id="st-last" style="margin-top:8px"></p>
+    <div id="st-items"></div>
+    <input type="text" id="st-note" placeholder="Note (optional) &mdash; e.g. water for Saturday&rsquo;s big group" autocomplete="off" style="margin-top:12px">
+    <div class="bar">
+      <button class="quiet" onclick="go('home')">Cancel</button>
+      <button class="primary" id="st-send" onclick="stSend_()" disabled>Send count</button>
+    </div>
+  </section>
+
+
+  <!-- FAULTS & HEADS-UPS QUICK VIEW (B49) -->
+  <section id="view-flist" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Faults &amp; heads-ups</h2>
+    <div class="chips" id="fl-kind"></div>
+    <div class="chips" id="fl-who" style="margin-top:6px"></div>
+    <p class="note" id="fl-sum" style="margin-top:8px"></p>
+    <div id="fl-list"></div>
+  </section>
+
   <!-- TOUR HUB -->
   <section id="view-tour" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
@@ -702,7 +753,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbxsFn3K78cbuEXrMjSBHjKhq1RF45kXZ8Lyj52zrTArgT5uSHwd5g_OxBw_wc4LC-Ef/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycby-9U7R9I1gcjEXtYibVxItPuQ60yXaxTU0trf9oKnejFyefd5jtkCKml72AmNM8HWR/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -715,7 +766,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B47';
+var UI_VERSION = 'B49';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -731,9 +782,11 @@ function paintSide_() {
   var vis = {
     'tile-lookup': true,
     'tile-rp': true,
+    'tile-flist': true,
     'tile-move': true,
     'tile-tour': !showOffice && !showWs,
     'tile-gdash': !showOffice && !showWs,
+    'tile-stock': !showWs,
     'tile-wq': showOffice || showWs,
     'tile-hist': showOffice || showWs,
     'tile-workshop': showOffice || showWs,
@@ -826,7 +879,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp','view-stock','view-flist'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -1767,6 +1820,113 @@ function paintBikeMeta_(b) {
   if (m) m.textContent = [b.category, b.brand, b.frameSize, b.wheelSize, b.colour, setupLabel_(b)].filter(Boolean).join(' \u00b7 ');
 }
 
+/* ---- Snacks & water count (B48) ---- */
+var st = { site: '', counts: {}, more: {} };
+function stUnit_(n, unit) {
+  unit = String(unit || 'boxes');
+  if (Number(n) !== 1) return unit;
+  if (/(x|s|ch|sh)es$/.test(unit)) return unit.slice(0, -2);
+  return /s$/.test(unit) ? unit.slice(0, -1) : unit;
+}
+function stSites_() { return (DB.locations || []).filter(function(l){ return l !== 'Workshop'; }); }
+function renderStock_() {
+  var saved = '';
+  try { saved = localStorage.getItem('cab_site') || ''; } catch(e) {}
+  var sites = stSites_();
+  st = { site: sites.indexOf(saved) !== -1 ? saved : (sites.length === 1 ? sites[0] : ''), counts: {}, more: {} };
+  document.getElementById('st-note').value = '';
+  stPaint_();
+}
+function stPaint_() {
+  pendChips_('st-sites', stSites_().map(function(l){ return [l, l]; }), st.site, function(v){ st.site = v; stPaint_(); });
+  var last = (DB.stockLast || {})[st.site], items = DB.stockItems || [];
+  document.getElementById('st-last').innerHTML = !st.site ? 'Pick your site first.'
+    : last ? 'Last count here: ' + fmtWhen_(last.when) + (last.by ? ' by ' + escH_(last.by) : '') : 'No count yet at ' + escH_(st.site) + '.';
+  document.getElementById('st-items').innerHTML = !items.length
+    ? '<p class="note">No items yet \u2014 add them on the Stock_Items tab of the sheet.</p>'
+    : items.map(function(it, i){
+        var v = st.counts[it.item], prev = last && last.items[it.item];
+        return '<div class="stk"><div class="nm"><b>' + escH_(it.item) + '</b><small>' +
+          (v === undefined || v === '' ? escH_(it.unit) : v + ' ' + escH_(stUnit_(v, it.unit))) +
+          (prev ? ' \u00b7 last time ' + prev.count : '') + '</small></div>' +
+          '<div class="step"><button class="quiet" onclick="stStep_(' + i + ', -1)">\u2212</button>' +
+          '<input type="number" inputmode="numeric" min="0" id="st-n' + i + '" value="' + (v === undefined ? '' : v) + '" oninput="stType_(' + i + ', this.value)">' +
+          '<button class="quiet" onclick="stStep_(' + i + ', 1)">+</button></div>' +
+          '<label class="more"><input type="checkbox" ' + (st.more[it.item] ? 'checked ' : '') + 'onchange="stMore_(' + i + ', this.checked)">Need more</label></div>';
+      }).join('');
+  stReady_();
+}
+function stReady_() {
+  var any = (DB.stockItems || []).some(function(it){ var v = st.counts[it.item]; return v !== undefined && v !== ''; });
+  document.getElementById('st-send').disabled = !(st.site && any);
+}
+function stStep_(i, d) {
+  var it = DB.stockItems[i], v = Number(st.counts[it.item]) || 0;
+  st.counts[it.item] = Math.max(0, v + d);
+  stPaint_();
+}
+function stType_(i, val) {
+  var it = DB.stockItems[i];
+  st.counts[it.item] = val === '' ? '' : Math.max(0, Math.floor(Number(val) || 0));
+  stReady_();
+}
+function stMore_(i, on) { st.more[DB.stockItems[i].item] = !!on; }
+function stSend_() {
+  var counts = (DB.stockItems || []).filter(function(it){ var v = st.counts[it.item]; return v !== undefined && v !== ''; })
+    .map(function(it){ return { item: it.item, count: Number(st.counts[it.item]), more: !!st.more[it.item] }; });
+  var missing = (DB.stockItems || []).length - counts.length;
+  if (missing > 0 && !confirm(missing + ' item' + (missing > 1 ? 's' : '') + ' not counted \u2014 send anyway?')) return;
+  var btn = document.getElementById('st-send');
+  btn.disabled = true; btn.textContent = 'Sending\u2026';
+  STOCK_CALL({ site: st.site, counts: counts, note: document.getElementById('st-note').value.trim() }, function(r){
+    btn.textContent = 'Send count';
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); stReady_(); return; }
+    DB.stockLast = DB.stockLast || {};
+    if (r.last) DB.stockLast[st.site] = r.last;
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); localStorage.setItem('cab_site', st.site); } catch(e) {}
+    toast(r.emailed ? (r.more.length ? 'Count sent \u2014 order emailed: ' + r.more.join(', ') : 'Count sent \u2014 thanks!')
+                    : 'Count saved \u2014 nobody on the Stock_Emails tab yet, so no email went out', !r.emailed);
+    go('home');
+  }, function(){ btn.textContent = 'Send count'; stReady_(); toast('Save failed \u2014 check signal', true); });
+}
+
+/* ---- Faults & heads-ups quick view (B49) ---- */
+var fl = { kind: 'all', who: '' };
+function flItems_() {
+  var bikes = {};
+  (DB.bikes || []).forEach(function(b){ bikes[b.assetId] = b; });
+  var out = (DB.faults || []).map(function(f){ return { k: 'fault', aid: f.assetId, text: f.fault, by: f.by, when: f.when, photo: f.photo, b: bikes[f.assetId] }; })
+    .concat((DB.notes || []).map(function(n){ return { k: 'note', aid: n.assetId, text: n.note, by: n.by, when: n.when, photo: n.photo, b: bikes[n.assetId] }; }));
+  return out.sort(function(a, b){ return String(b.when) < String(a.when) ? -1 : String(b.when) > String(a.when) ? 1 : 0; });
+}
+function renderFlist_() {
+  var all = flItems_();
+  var nF = all.filter(function(x){ return x.k === 'fault'; }).length, nN = all.length - nF;
+  pendChips_('fl-kind', [['all', 'All (' + all.length + ')'], ['fault', 'Faults (' + nF + ')'], ['note', 'Heads-ups (' + nN + ')']], fl.kind,
+    function(v){ fl.kind = v; renderFlist_(); });
+  var people = {};
+  all.forEach(function(x){ if (x.by) people[x.by] = (people[x.by] || 0) + 1; });
+  var names = Object.keys(people).sort();
+  if (fl.who && !people[fl.who]) fl.who = '';
+  pendChips_('fl-who', [['', 'Everyone']].concat(names.map(function(n){ return [n, n + ' (' + people[n] + ')']; })), fl.who,
+    function(v){ fl.who = v; renderFlist_(); });
+  var list = all.filter(function(x){ return (fl.kind === 'all' || x.k === fl.kind) && (!fl.who || x.by === fl.who); });
+  var today = isoDay_(new Date()), nToday = list.filter(function(x){ return isoDay_(new Date(x.when)) === today; }).length;
+  document.getElementById('fl-sum').textContent = list.length
+    ? list.length + ' open' + (nToday ? ' \u00b7 ' + nToday + ' logged today' : '') + ' \u2014 tap one to open the bike'
+    : 'Nothing open' + (fl.who ? ' from ' + fl.who : '') + ' \u2014 all clear.';
+  document.getElementById('fl-list').innerHTML = list.map(function(x){
+    var b = x.b || {}, code = b.barcode || x.aid, isNew = isoDay_(new Date(x.when)) === today;
+    var days = isNew ? '' : openDays_(x.when);
+    return '<div class="fl ' + (x.k === 'note' ? 'hu' : 'ft') + '" onclick="openBikeByBarcode(\'' + jsq_(code) + '\', \'flist\')">' +
+      '<div class="t"><b>' + escH_(x.aid) + (isNew ? '<span class="new">new</span>' : '') + '</b><span>' +
+      escH_([STATUS_LABELS[b.status] || b.status, b.location].filter(Boolean).join(' \u00b7 ')) + '</span></div>' +
+      '<div class="d">' + (x.k === 'note' ? '\u26a0 ' : '') + escH_(x.text) + '</div>' +
+      '<div class="m">' + (x.k === 'note' ? 'Heads-up' : 'Fault') + ' \u00b7 ' + escH_(x.by || '?') + ' \u00b7 ' + fmtWhen_(x.when) +
+      (days ? ' \u00b7 ' + days : '') + '</div>' + thumb_(x.photo) + '</div>';
+  }).join('');
+}
+
 function renderGreet_() {
   var el = document.getElementById('home-greet');
   if (!el) return;
@@ -1869,6 +2029,13 @@ function go(view) {
   } else if (view === 'gtask') {
     openGtask_();
     show('view-gtask');
+  } else if (view === 'flist') {
+    renderFlist_();
+    show('view-flist');
+    REFRESH_DATA(function(){ var v = document.getElementById('view-flist'); if (v && !v.classList.contains('hidden')) renderFlist_(); });
+  } else if (view === 'stock') {
+    renderStock_();
+    show('view-stock');
   } else if (view === 'rp') {
     rpReset_();
     show('view-rp');
@@ -3061,6 +3228,7 @@ function PARTSDONE_CALL(rows, ok, err) { apiPost({ action: 'partsdone', rows: ro
 function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (staffCheck_()) return; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
 function PROBLEM_CALL(p, ok, err) { p.action = 'problem'; p.user = user; apiPost(p, ok, err); }
+function STOCK_CALL(p, ok, err) { apiPost({ action: 'stock', site: p.site, counts: p.counts, note: p.note, user: user }, ok, err); }
 function SETUP_CALL(p, ok, err) { apiPost({ action: 'setup', code: p.code, gears: p.gears, rings: p.rings, user: user, pin: pin }, ok, err); }
 function NOTE_CALL(p, ok, err) { apiPost({ action: 'clearnote', row: p.row, assetId: p.assetId, toFault: !!p.toFault, user: user, pin: pin }, ok, err); }
 
