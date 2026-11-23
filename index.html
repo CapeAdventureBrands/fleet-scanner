@@ -242,6 +242,27 @@
   .brand .mini div { height:100%; }
   .brand .ct { font-size:12px; color:var(--grey); width:58px; text-align:right; flex-shrink:0; }
   .brand .on .nm { text-decoration:underline; }
+  .fcday { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:10px; }
+  .fcday .dh { font-weight:700; font-size:15px; display:flex; justify-content:space-between; }
+  .fcday .dh span { font-weight:400; font-size:12px; color:var(--grey); }
+  .fcsite { padding:8px 0 4px; border-top:1px solid var(--line); margin-top:8px; cursor:pointer; }
+  .fcsite:first-of-type { border-top:none; }
+  .fcsite .sn { font-size:13px; color:var(--grey); text-transform:uppercase; letter-spacing:.04em; }
+  .fcl { display:flex; align-items:baseline; gap:8px; font-size:14px; margin-top:3px; }
+  .fcl .ty { width:84px; flex-shrink:0; font-weight:600; }
+  .fcl .nh { flex:1; }
+  .fcl .df { font-weight:700; min-width:48px; text-align:right; padding:1px 6px; border-radius:6px; color:#fff; }
+  .fcl .df.up { background:#1B7A3D; } .fcl .df.tight { background:#D9A93C; } .fcl .df.down { background:var(--red); }
+  .fcsub { font-size:12px; color:var(--grey); margin:1px 0 0 92px; }
+  .fcready { background:#FDECEC; border-left:4px solid var(--red); border-radius:6px; padding:8px 10px; margin-top:10px; font-size:14px; }
+  .fcready.ok { background:#E8F4EC; border-left-color:#1B7A3D; }
+  .fcready div { margin-top:4px; }
+  table.fcsz { border-collapse:collapse; margin-top:6px; font-size:13px; }
+  table.fcsz td, table.fcsz th { border:1px solid var(--line); padding:4px 8px; text-align:center; }
+  .fcadj { display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .fcadj button { width:36px; height:36px; margin:0; padding:0; font-size:18px; }
+  .fcadj input.n { width:52px; text-align:center; margin:0; }
+  .fcadj input.t { flex:1; min-width:120px; margin:0; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -301,6 +322,10 @@
       <button class="tile" onclick="go('rp')" id="tile-rp">
         <div class="big">Report a bike problem</div>
         <div class="sub">Something wrong, or worth knowing &mdash; add a photo</div>
+      </button>
+      <button class="tile" onclick="go('fc')" id="tile-fc">
+        <div class="big">Bike forecast</div>
+        <div class="sub">Bikes needed per day from the manifest &mdash; up or down per site</div>
       </button>
       <button class="tile" onclick="go('flist')" id="tile-flist">
         <div class="big">Faults &amp; heads-ups</div>
@@ -544,6 +569,7 @@
   <section id="view-wq" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
     <h2>Bikes needing attention</h2>
+    <div id="wq-fc"></div>
     <p class="note">What to pick up next. Tap a bike to open its job card and log the work &mdash; or tick it when it&rsquo;s sorted and clear several at once.</p>
     <div id="wq-list"></div>
     <button class="primary" style="width:100%;margin-top:12px;display:none" id="wq-done" onclick="saveWqFixed_()" disabled>Tick bikes when they&rsquo;re sorted</button>
@@ -673,6 +699,23 @@
     <div id="fl-list"></div>
   </section>
 
+
+  <!-- BIKE FORECAST (B53) -->
+  <section id="view-fc" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Bike forecast</h2>
+    <p class="note" id="fc-src">Loading the manifest&hellip;</p>
+    <div class="chips" id="fc-sites"></div>
+    <div id="fc-ready"></div>
+    <div id="fc-days"></div>
+  </section>
+
+  <section id="view-fcd" class="hidden">
+    <button class="back" onclick="go('fc')">&#8249; Back</button>
+    <h2 id="fcd-title"></h2>
+    <div id="fcd-body"></div>
+  </section>
+
   <!-- TOUR HUB -->
   <section id="view-tour" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
@@ -762,7 +805,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbw4dX3oEZdF3UOSo2Uv6CRna7ORq0n22FC2pDpLgpccC-PcvOIrZtes0pFZ62YfKVM/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwSLWIZCdoTCtZSemszd7d3rEmHCMoYP_FTwa9i460-Qi-hg1pbCxpx01XCsYEwROPf/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -775,7 +818,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B52';
+var UI_VERSION = 'B53';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -792,6 +835,7 @@ function paintSide_() {
     'tile-lookup': true,
     'tile-rp': true,
     'tile-flist': true,
+    'tile-fc': true,
     'tile-move': true,
     'tile-tour': !showOffice && !showWs,
     'tile-gdash': !showOffice && !showWs,
@@ -888,7 +932,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp','view-stock','view-flist'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp','view-stock','view-flist','view-fc','view-fcd'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -1958,6 +2002,176 @@ function renderFlist_() {
   }).join('');
 }
 
+/* ---- Bike forecast (B53) ---- */
+var FC = null, fcSite = 'All', fcSel = null;
+var FC_TYPES = { STD: 'STD bikes', E: 'E-bikes', Hybrid: 'Hybrids', Road: 'Road bikes' };
+var FC_SITE_ORDER = ['Stellenbosch', 'Franschhoek', 'Cape Town', 'Workshop'];
+function fcDay_(iso) {
+  var t = isoDay_(new Date()), tm = isoDay_(new Date(Date.now() + 864e5));
+  return niceDay_(iso) + (iso === t ? ' \u00b7 today' : iso === tm ? ' \u00b7 tomorrow' : '');
+}
+function fcAdj_(date, site, type) {
+  var a = null;
+  ((FC && FC.adjust) || []).forEach(function(x){ if (x.date === date && x.site === site && x.type === type) a = x; });
+  return a;
+}
+function fcSupply_(site, type, date) {
+  var cats = (FC && FC.cats && FC.cats[type]) || [], r = { have: 0, due: 0, sizes: {}, bench: 0, spare: 0 };
+  var DOWN = { 'Pending': 1, 'Workshop': 1, 'Waiting for parts': 1 };
+  (DB.bikes || []).forEach(function(b){
+    if (b.active === 'No' || cats.indexOf(b.category) === -1) return;
+    var ok = b.status === 'Available' || b.status === 'On tour';
+    var back = DOWN[b.status] && b.pendBy && String(b.pendBy).slice(0, 10) <= date;
+    if (b.location === site && (ok || back)) {
+      r.have++; if (back) r.due++;
+      var z = b.frameSize || '?'; r.sizes[z] = (r.sizes[z] || 0) + 1;
+    } else if (DOWN[b.status]) r.bench++;
+    else if (ok && b.location === 'Workshop' && site !== 'Workshop') r.spare++;
+  });
+  return r;
+}
+function fcCalc_(date, site, type, t) {
+  var a = fcAdj_(date, site, type), need = t.need + (a ? a.change : 0), s = fcSupply_(site, type, date);
+  return { need: need, adj: a, sup: s, diff: s.have - need };
+}
+function fcTypes_(date, site, S) {
+  return Object.keys(S.types).filter(function(ty){ var t = S.types[ty]; return t.need || t.maybe || fcAdj_(date, site, ty); });
+}
+function fcDfCls_(d) { return d < 0 ? 'down' : d <= 2 ? 'tight' : 'up'; }
+function fcSigned_(d) { return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d); }
+function fcSites_(day) {
+  return Object.keys(day.sites).sort(function(a, b){
+    var ia = FC_SITE_ORDER.indexOf(a), ib = FC_SITE_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+}
+function fcShort_(days) {
+  var out = [], until = isoDay_(new Date(Date.now() + (days || 3) * 864e5));
+  ((FC && FC.days) || []).forEach(function(d){
+    if (d.date > until) return;
+    fcSites_(d).forEach(function(site){
+      Object.keys(d.sites[site].types).forEach(function(ty){
+        var c = fcCalc_(d.date, site, ty, d.sites[site].types[ty]);
+        if (c.diff < 0) out.push({ date: d.date, site: site, type: ty, short: -c.diff, bench: c.sup.bench, spare: c.sup.spare });
+      });
+    });
+  });
+  return out;
+}
+function fcReadyHtml_(list, forWorkshop) {
+  if (!list.length) return '<div class="fcready ok"><b>\u2713 Enough bikes for the next 3 days</b>' +
+    (forWorkshop ? '' : ' at every site, on the manifest as it stands.') + '</div>';
+  return '<div class="fcready"><b>\u26a0 Short in the next 3 days \u2014 get these ready</b>' + list.map(function(x){
+    var help = [];
+    if (x.spare) help.push(x.spare + ' ready at the Workshop to send');
+    if (x.bench) help.push(x.bench + ' on the bench / pending to fix');
+    return '<div><b>' + fcDay_(x.date).split(' \u00b7 ')[0] + ' \u00b7 ' + escH_(x.site) + '</b>: ' + x.short + ' ' + FC_TYPES[x.type] + ' short' +
+      (help.length ? ' \u2014 ' + help.join(', ') : '') + '</div>';
+  }).join('') + '</div>';
+}
+function fcLine_(date, site, ty, t) {
+  var c = fcCalc_(date, site, ty, t), sub = [];
+  sub.push(t.guests + ' guests + ' + t.guides + ' guide' + (t.guides === 1 ? '' : 's'));
+  if (t.both) sub.push(t.slot + ' busiest');
+  if (t.maybe) sub.push('+' + t.maybe + ' maybe (provisional)');
+  if (c.adj) sub.push((c.adj.by || 'adjusted') + ' ' + fcSigned_(c.adj.change) + (c.adj.note ? ' (' + escH_(c.adj.note) + ')' : ''));
+  if (c.sup.due) sub.push(c.sup.due + ' due back from the workshop');
+  return '<div class="fcl"><span class="ty">' + FC_TYPES[ty] + '</span><span class="nh">need <b>' + c.need + '</b> \u00b7 have ' + c.sup.have + '</span>' +
+    '<span class="df ' + fcDfCls_(c.diff) + '">' + fcSigned_(c.diff) + '</span></div><div class="fcsub">' + sub.join(' \u00b7 ') + '</div>';
+}
+function renderFc_() {
+  var src = document.getElementById('fc-src');
+  if (!FC) { src.textContent = 'Loading the manifest\u2026'; return; }
+  if (!FC.ok) { src.innerHTML = '<b style="color:var(--red)">' + escH_(FC.error || 'Forecast unavailable') + '</b>'; document.getElementById('fc-days').innerHTML = ''; return; }
+  var sites = {};
+  FC.days.forEach(function(d){ fcSites_(d).forEach(function(s){ sites[s] = 1; }); });
+  var list = FC_SITE_ORDER.filter(function(s){ return sites[s]; }).concat(Object.keys(sites).filter(function(s){ return FC_SITE_ORDER.indexOf(s) === -1; }));
+  if (fcSite !== 'All' && !sites[fcSite]) fcSite = 'All';
+  pendChips_('fc-sites', [['All', 'All sites']].concat(list.map(function(s){ return [s, s === 'Workshop' ? 'Warehouse' : s]; })), fcSite,
+    function(v){ fcSite = v; renderFc_(); });
+  src.innerHTML = 'From the manifest \u00b7 ' + escH_(FC.updated) + ' \u00b7 next ' + FC.days.length + ' tour days \u00b7 ' +
+    '<a href="#" onclick="fcLoad_(true);return false">refresh</a>' +
+    (FC.unmapped && FC.unmapped.length ? '<br><b style="color:var(--red)">Start point not set up: ' + escH_(FC.unmapped.join(', ')) + '</b> \u2014 add it on the Forecast_Setup tab' : '');
+  document.getElementById('fc-ready').innerHTML = fcReadyHtml_(fcShort_(3).filter(function(x){ return fcSite === 'All' || x.site === fcSite; }));
+  document.getElementById('fc-days').innerHTML = FC.days.map(function(d){
+    var blocks = fcSites_(d).filter(function(s){ return fcSite === 'All' || s === fcSite; }).map(function(site){
+      var S = d.sites[site];
+      return '<div class="fcsite" onclick="fcOpen_(\'' + d.date + '\', \'' + jsq_(site) + '\')"><div class="sn">' + escH_(site === 'Workshop' ? 'Warehouse (Workshop)' : site) + '</div>' +
+        fcTypes_(d.date, site, S).map(function(ty){ return fcLine_(d.date, site, ty, S.types[ty]); }).join('') +
+        (S.kids || S.seats ? '<div class="fcsub" style="margin-left:0">' + [S.kids ? S.kids + ' kids bike' + (S.kids > 1 ? 's' : '') : '', S.seats ? S.seats + ' child seat' + (S.seats > 1 ? 's' : '') + ' / tag-along' : ''].filter(Boolean).join(' \u00b7 ') + '</div>' : '') +
+        '</div>';
+    }).join('');
+    return blocks ? '<div class="fcday"><div class="dh">' + fcDay_(d.date) + '</div>' + blocks + '</div>' : '';
+  }).join('') || '<p class="note">No bike tours on the manifest for these days.</p>';
+}
+function fcOpen_(date, site) { fcSel = { date: date, site: site }; renderFcd_(); show('view-fcd'); }
+function renderFcd_() {
+  var day = null;
+  (FC.days || []).some(function(d){ if (d.date === fcSel.date) { day = d; return true; } });
+  if (!day || !day.sites[fcSel.site]) { go('fc'); return; }
+  var S = day.sites[fcSel.site], site = fcSel.site;
+  document.getElementById('fcd-title').textContent = fcDay_(day.date) + ' \u00b7 ' + (site === 'Workshop' ? 'Warehouse' : site);
+  var h = '';
+  fcTypes_(day.date, site, S).forEach(function(ty){
+    var t = S.types[ty], c = fcCalc_(day.date, site, ty, t), sizes = ['XS', 'S', 'M', 'L', 'XL'];
+    h += '<div class="card" style="margin-top:10px">' + fcLine_(day.date, site, ty, t);
+    h += '<table class="fcsz"><tr><th></th>' + sizes.map(function(z){ return '<th>' + z + '</th>'; }).join('') + '<th>?</th></tr>' +
+      '<tr><td>Need</td>' + sizes.map(function(z){ return '<td>' + (t.sizes[z] || '') + '</td>'; }).join('') + '<td>' + (t.unknown || '') + '</td></tr>' +
+      '<tr><td>Have</td>' + sizes.map(function(z){ return '<td>' + (c.sup.sizes[z] || '') + '</td>'; }).join('') + '<td>' + (c.sup.sizes['?'] || '') + '</td></tr></table>' +
+      '<p class="note" style="margin:4px 0 0">Need sizes are guests who gave a height; ? = size not given yet. Guides not in the size row.</p>';
+    if (c.diff < 0 && (c.sup.spare || c.sup.bench)) h += '<p class="note" style="color:var(--red);margin:6px 0 0">Short ' + (-c.diff) + ': ' +
+      [c.sup.spare ? c.sup.spare + ' ready at the Workshop to send' : '', c.sup.bench ? c.sup.bench + ' on the bench / pending' : ''].filter(Boolean).join(' \u00b7 ') + '</p>';
+    var a = c.adj ? c.adj.change : 0, k = day.date + '|' + site + '|' + ty;
+    h += '<div class="fcadj"><span style="font-size:13px">Adjust</span>' +
+      '<button class="quiet" onclick="fcStep_(\'' + jsq_(k) + '\', -1)">\u2212</button>' +
+      '<input class="n" type="number" id="fca-' + ty + '" value="' + a + '">' +
+      '<button class="quiet" onclick="fcStep_(\'' + jsq_(k) + '\', 1)">+</button>' +
+      '<input class="t" type="text" id="fcn-' + ty + '" placeholder="why \u2014 e.g. extra guide, VIP" value="' + escH_(c.adj ? c.adj.note : '') + '">' +
+      '<button class="primary" style="width:auto;height:36px;padding:0 12px;margin:0" onclick="fcSaveAdj_(\'' + jsq_(k) + '\')">Save</button></div></div>';
+  });
+  var tours = (FC.tours || []).filter(function(x){ return x.date === day.date && x.site === site; });
+  h += '<h2>Tours</h2>' + tours.map(function(x){
+    var sz = Object.keys(x.sizes).map(function(z){ return x.sizes[z] + '\u00d7' + z; }).join(' ');
+    return '<div class="fl" style="cursor:default"><div class="t"><b>' + escH_(x.time) + ' ' + escH_(x.name) + '</b><span>' + FC_TYPES[x.type] + '</span></div>' +
+      '<div class="m">' + x.conf + ' guests' + (x.guides ? ' + ' + x.guides + ' guide' + (x.guides > 1 ? 's' : '') : '') +
+      (x.maybe ? ' \u00b7 <b>+' + x.maybe + ' provisional</b>' : '') + (sz ? ' \u00b7 ' + sz : '') + (x.unknown ? ' \u00b7 ' + x.unknown + ' size unknown' : '') +
+      (x.kids ? ' \u00b7 ' + x.kids + ' kids' : '') + (x.seats ? ' \u00b7 ' + x.seats + ' child seats' : '') + (x.full ? ' \u00b7 full day' : '') + '</div></div>';
+  }).join('');
+  document.getElementById('fcd-body').innerHTML = h;
+}
+function fcStep_(k, d) {
+  var ty = k.split('|')[2], el = document.getElementById('fca-' + ty);
+  el.value = (Number(el.value) || 0) + d;
+}
+function fcSaveAdj_(k) {
+  var p = k.split('|'), ty = p[2];
+  FCADJ_CALL({ date: p[0], site: p[1], type: ty, change: Number(document.getElementById('fca-' + ty).value) || 0,
+               note: document.getElementById('fcn-' + ty).value.trim() }, function(r){
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); return; }
+    FC.adjust = r.adjust;
+    try { localStorage.setItem('cab_fc', JSON.stringify(FC)); } catch(e) {}
+    toast('Adjustment saved');
+    renderFcd_();
+  }, function(){ toast('Save failed \u2014 check signal', true); });
+}
+function fcLoad_(force, after) {
+  FORECAST_CALL(!!force, function(r){
+    FC = r || { ok: false, error: 'Server is running old code \u2014 redeploy Code.gs (New version)' };
+    if (FC.ok) { try { localStorage.setItem('cab_fc', JSON.stringify(FC)); } catch(e) {} }
+    if (after) after(); else renderFc_();
+  }, function(){ if (!FC) FC = { ok: false, error: 'Couldn\u2019t reach the server \u2014 check signal' }; if (after) after(); else renderFc_(); });
+}
+function fcCached_() {
+  if (FC) return FC;
+  try { var c = JSON.parse(localStorage.getItem('cab_fc') || 'null'); if (c && c.ok) FC = c; } catch(e) {}
+  return FC;
+}
+function paintWqFc_() {
+  var box = document.getElementById('wq-fc');
+  if (!box) return;
+  box.innerHTML = fcCached_() && FC.ok ? fcReadyHtml_(fcShort_(3), true) : '';
+}
+
 function renderGreet_() {
   var el = document.getElementById('home-greet');
   if (!el) return;
@@ -2060,6 +2274,11 @@ function go(view) {
   } else if (view === 'gtask') {
     openGtask_();
     show('view-gtask');
+  } else if (view === 'fc') {
+    fcCached_();
+    renderFc_();
+    show('view-fc');
+    fcLoad_(false, function(){ var v = document.getElementById('view-fc'); if (v && !v.classList.contains('hidden')) renderFc_(); });
   } else if (view === 'flist') {
     renderFlist_();
     show('view-flist');
@@ -2092,7 +2311,9 @@ function go(view) {
     return;
   } else if (view === 'wq') {
     renderWq_();
+    paintWqFc_();
     show('view-wq');
+    fcLoad_(false, paintWqFc_);
     REFRESH_DATA(function(){
       try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
       var v = document.getElementById('view-wq'); if (v && !v.classList.contains('hidden')) renderWq_();
@@ -3310,6 +3531,8 @@ function PARTSDONE_CALL(rows, ok, err) { apiPost({ action: 'partsdone', rows: ro
 function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (staffCheck_()) return; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
 function PROBLEM_CALL(p, ok, err) { p.action = 'problem'; p.user = user; apiPost(p, ok, err); }
+function FORECAST_CALL(force, ok, err) { apiPost({ action: 'forecast', force: !!force, user: user }, ok, err); }
+function FCADJ_CALL(p, ok, err) { apiPost({ action: 'fcadjust', date: p.date, site: p.site, type: p.type, change: p.change, note: p.note, user: user }, ok, err); }
 function STOCK_CALL(p, ok, err) { apiPost({ action: 'stock', site: p.site, counts: p.counts, note: p.note, user: user }, ok, err); }
 function SETUP_CALL(p, ok, err) { apiPost({ action: 'setup', code: p.code, gears: p.gears, rings: p.rings, user: user, pin: pin }, ok, err); }
 function NOTE_CALL(p, ok, err) { apiPost({ action: 'clearnote', row: p.row, assetId: p.assetId, toFault: !!p.toFault, user: user, pin: pin }, ok, err); }
