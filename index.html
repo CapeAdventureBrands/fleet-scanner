@@ -232,6 +232,16 @@
   .fl.hu { border-left:4px solid #E0A800; padding-left:8px; }
   .fl.ft { border-left:4px solid var(--red); padding-left:8px; }
   .fl .new { background:var(--red); color:#fff; font-size:11px; padding:1px 6px; border-radius:8px; margin-left:6px; }
+  .brand { margin-top:12px; }
+  .brand .bh, .brand .bt { display:flex; align-items:center; gap:8px; cursor:pointer; }
+  .brand .bh { font-size:16px; padding:6px 0 4px; border-bottom:1px solid var(--line); }
+  .brand .bt { font-size:14px; padding:6px 0 6px 12px; }
+  .brand .nm { width:96px; flex-shrink:0; }
+  .brand .pc { width:44px; text-align:right; font-weight:700; flex-shrink:0; }
+  .brand .mini { flex:1; height:8px; background:var(--line); border-radius:4px; overflow:hidden; min-width:40px; }
+  .brand .mini div { height:100%; }
+  .brand .ct { font-size:12px; color:var(--grey); width:58px; text-align:right; flex-shrink:0; }
+  .brand .on .nm { text-decoration:underline; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -403,6 +413,11 @@
       <div class="stackbar" id="d-bar"></div>
       <div class="legend" id="d-legend"></div>
       <div id="d-statlist"></div>
+    </div>
+
+    <div class="card" style="margin-top:10px">
+      <div class="k-label">Ready by brand &amp; bike type</div>
+      <div id="d-brands"></div>
     </div>
 
     <h2>What&rsquo;s where, by size</h2>
@@ -620,7 +635,7 @@
     <input type="file" id="rp-photo" accept="image/*" multiple class="hidden" onchange="photoPicked_('rp', this)">
     <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('rp-photo').click()">&#128247; Add photos (optional, up to 4)</button>
     <p class="note" id="rp-photo-note"></p>
-      <h2>Can it still be ridden?</h2>
+      <h2>Can the bike be ridden?</h2>
       <div class="chips" id="rp-ride"></div>
       <p class="note" id="rp-lock" style="display:none;color:var(--red);margin:6px 0 0">Brakes or steering &mdash; it can&rsquo;t go out until the workshop has checked it.</p>
       <p class="note" id="rp-what" style="margin-top:8px"></p>
@@ -747,7 +762,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbypy04WD42QXo-4cTJZncckbSoxYFQrxhZqvFT253I-cVo6fd8lybrAFZep2s5X7qmU/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbw4dX3oEZdF3UOSo2Uv6CRna7ORq0n22FC2pDpLgpccC-PcvOIrZtes0pFZ62YfKVM/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -760,7 +775,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B51';
+var UI_VERSION = 'B52';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -1671,11 +1686,11 @@ function clearNote_(row, toFault) {
 }
 
 var rp = { bike: null, sel: [], ride: '' };
-var RP_RIDE = [['fine', 'Yes \u2014 rides fine, just be aware'], ['soon', 'Yes \u2014 but needs fixing soon'], ['no', 'No \u2014 don\u2019t ride it']];
+var RP_RIDE = [['fine', 'Yes'], ['soon', 'Yes, with care'], ['no', 'No \u2014 not for guests']];
 var RP_WHAT = {
-  fine: 'Saved as a <b>heads-up</b>. The bike stays Ready to ride, and guides see the note when they scan it out.',
-  soon: 'Logged as a <b>fault</b> for the workshop. The bike stays Ready to ride until it\u2019s fixed.',
-  no: 'Logged as a <b>fault</b> and the bike goes to <b>Pending check</b> \u2014 it can\u2019t go out on a tour.'
+  fine: '<b>Rides fine</b> \u2014 saved as a heads-up note (e.g. front wheel squeaks). The bike stays Ready to ride and guides see the note when they scan it out.',
+  soon: '<b>Rides, but with care</b> \u2014 logged as a fault for the workshop. The bike stays Ready to ride until it\u2019s fixed.',
+  no: '<b>Not for guests</b> \u2014 logged as a fault and the bike goes to Pending check, so it can\u2019t go out on a tour.'
 };
 function rpReset_() {
   rp = { bike: null, sel: [], ride: '' };
@@ -2684,7 +2699,7 @@ function confirmAssign(bike, force) {
 }
 
 /* ---------- lookup / move ---------- */
-var FAULT_CHIPS = ['Puncture','Brakes','Gears','Chain','Battery / motor','Wheel / spokes','Other'];
+var FAULT_CHIPS = ['Puncture','Brakes','Gears','Derailleur','Shifter','Hanger','Chain','Seat clamp','Wheel / spokes','Battery / motor','Error code 10','Error code 13','Error code 20','Other'];
 var faultSel = [];
 function renderFaults_(id, faults, forWorkshop) {
   var el = document.getElementById(id);
@@ -2825,6 +2840,53 @@ function sizeOrder_(s) {
   return 200;
 }
 
+/* ---- Brand & bike-type split (B52): BNW vs iRide ---- */
+var BRAND_GROUPS = [
+  ['BNW',   ['MTB', 'E-Bike', 'Kids', 'Hybrid', 'Cruiser', 'Accessories', 'GT']],
+  ['iRide', ['iRide', 'Road', 'Gravel']]
+];
+function catLabel_(c) { return c === 'iRide' ? 'Road' : c; }
+function brandOf_(cat) { return BRAND_GROUPS[1][1].indexOf(cat) !== -1 ? 'iRide' : 'BNW'; }
+function catOrder_(c) {
+  for (var g = 0; g < BRAND_GROUPS.length; g++) {
+    var i = BRAND_GROUPS[g][1].indexOf(c);
+    if (i !== -1) return g * 100 + i;
+  }
+  return 50;  // anything new sits at the end of BNW
+}
+function pctColor_(p) { return p >= 75 ? 'var(--green, #1B7A3D)' : p >= 50 ? '#D9A93C' : 'var(--red)'; }
+function renderBrands_(bikes) {
+  var by = {};
+  bikes.forEach(function(b){
+    var c = bucketCat_(b);
+    by[c] = by[c] || { n: 0, r: 0 };
+    by[c].n++;
+    if (b.status === 'Available') by[c].r++;
+  });
+  var row = function(cls, name, r, n, onclick, on) {
+    var p = n ? Math.round(r / n * 100) : 0;
+    return '<div class="' + cls + (on ? ' on' : '') + '" onclick="' + onclick + '"><span class="nm">' + name + '</span>' +
+      '<span class="pc" style="color:' + pctColor_(p) + '">' + p + '%</span>' +
+      '<span class="mini"><div style="width:' + p + '%;background:' + pctColor_(p) + '"></div></span>' +
+      '<span class="ct">' + r + ' of ' + n + '</span></div>';
+  };
+  var h = '';
+  BRAND_GROUPS.forEach(function(g){
+    var cats = Object.keys(by).filter(function(c){ return brandOf_(c) === g[0]; })
+      .sort(function(a, b){ return catOrder_(a) - catOrder_(b); });
+    if (!cats.length) return;
+    var n = 0, r = 0;
+    cats.forEach(function(c){ n += by[c].n; r += by[c].r; });
+    h += '<div class="brand">' + row('bh', '<b>' + g[0] + '</b>', r, n, "dashFilter='" + g[0] + "';renderDash()", dashFilter === g[0]);
+    cats.forEach(function(c){
+      h += row('bt', escH_(catLabel_(c)), by[c].r, by[c].n, "dashFilter='" + jsq_(c) + "';renderDash()", dashFilter === c);
+    });
+    h += '</div>';
+  });
+  document.getElementById('d-brands').innerHTML = h +
+    '<p class="note" style="margin:8px 0 0">Ready to ride &divide; all tour bikes of that type (guide bikes left out). Tap a line to filter the size grid below.</p>';
+}
+
 function renderDash() {
   var bikes = activeBikes_();
 
@@ -2864,6 +2926,8 @@ function renderDash() {
   document.getElementById('d-legend').innerHTML = leg;
   paintStat_();
 
+  renderBrands_(bikes);
+
   /* filter chips */
   var ff = document.getElementById('d-filters');
   ff.innerHTML = '';
@@ -2872,18 +2936,19 @@ function renderDash() {
   cats.slice(1).sort();
   var counts_ = {};
   bikes.forEach(function(b){ var c = bucketCat_(b); counts_[c] = (counts_[c] || 0) + 1; });
-  cats = ['All'].concat(cats.slice(1).sort(function(a,b){ return (counts_[b]||0) - (counts_[a]||0); }));
-  if (cats.indexOf(dashFilter) === -1) dashFilter = 'All';
+  cats = ['All'].concat(cats.slice(1).sort(function(a,b){ return catOrder_(a) - catOrder_(b); }));
+  if (cats.indexOf(dashFilter) === -1 && dashFilter !== 'BNW' && dashFilter !== 'iRide') dashFilter = 'All';
   cats.forEach(function(f){
     var b = document.createElement('button');
     b.className = 'chip' + (f === dashFilter ? ' on' : '');
-    b.textContent = f;
+    b.textContent = catLabel_(f);
     b.onclick = function(){ dashFilter = f; renderDash(); };
     ff.appendChild(b);
   });
 
   /* matrix */
-  var pool = bikes.filter(function(b){ return dashFilter === 'All' || bucketCat_(b) === dashFilter; });
+  var pool = bikes.filter(function(b){ var c = bucketCat_(b);
+    return dashFilter === 'All' || c === dashFilter || ((dashFilter === 'BNW' || dashFilter === 'iRide') && brandOf_(c) === dashFilter); });
   var sizes = [];
   pool.forEach(function(b){ var s = bucketSize_(b); if (sizes.indexOf(s) === -1) sizes.push(s); });
   sizes.sort(function(a,b){ return sizeOrder_(a) - sizeOrder_(b); });
