@@ -30,7 +30,7 @@
   #reader video { display:block; }
 
   .manual { display:flex; gap:8px; margin-top:10px; }
-  input[type=text], input[type=search] {
+  input[type=text], input[type=search], #veh-km, #inv-n {
     width:100%; font:16px 'Inter',sans-serif; padding:12px; border:2px solid var(--black); border-radius:0;
   }
   input:focus { outline:3px solid var(--red); outline-offset:-1px; }
@@ -263,6 +263,30 @@
   .fcadj button { width:36px; height:36px; margin:0; padding:0; font-size:18px; }
   .fcadj input.n { width:52px; text-align:center; margin:0; }
   .fcadj input.t { flex:1; min-width:120px; margin:0; }
+  .clockgo { width:100%; font-size:18px; padding:14px; margin-top:12px; }
+  .clock { border-radius:8px; padding:10px 12px; margin-top:12px; border:2px solid #1B7A3D; background:#E8F4EC; }
+  .clock.paused { border-color:#D9A93C; background:#FFF6DB; }
+  .clock .ct { font-size:18px; }
+  .clock .ct b { font-size:24px; font-variant-numeric:tabular-nums; }
+  .clock .cm { font-size:12px; color:var(--grey); }
+  .clock .cb { display:flex; gap:8px; margin-top:8px; }
+  .clock .cb button { flex:1; margin:0; }
+  .clock .tq { display:flex; align-items:center; gap:8px; font-size:13px; margin-top:10px; }
+  .clock .tq input { width:18px; height:18px; margin:0; }
+  .veh { border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:10px; }
+  .veh .vh { display:flex; justify-content:space-between; align-items:center; }
+  .veh .vn { font-size:20px; font-weight:700; }
+  .veh .vs { font-size:13px; color:var(--grey); margin-top:4px; }
+  .veh .vt { font-size:12px; font-weight:700; padding:3px 8px; border-radius:10px; }
+  .veh .vt.in { background:#E8F4EC; color:#1B7A3D; } .veh .vt.out { background:#FFF6DB; color:#8A6510; }
+  .veh button { width:100%; margin-top:10px; }
+  .inv { padding:10px 2px; border-bottom:1px solid var(--line); }
+  .inv .ih { display:flex; justify-content:space-between; gap:10px; cursor:pointer; }
+  .inv .ih span { font-size:12px; color:var(--grey); }
+  .inv .iq { font-weight:700; white-space:nowrap; }
+  .inv.low .iq { color:var(--red); }
+  .inv .ip { margin-top:8px; }
+  .inv .ip input { margin-top:6px; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -338,6 +362,14 @@
       <button class="tile" onclick="go('tour')" id="tile-tour">
         <div class="big">Tour bikes</div>
         <div class="sub">Scan bikes out for your tour &mdash; and back in after</div>
+      </button>
+      <button class="tile" onclick="go('veh')" id="tile-veh">
+        <div class="big">Vehicles</div>
+        <div class="sub">Bakkie, Ford, NV, Quantum &mdash; check out and in with km</div>
+      </button>
+      <button class="tile" onclick="requireRole('workshop','inv')" id="tile-inv">
+        <div class="big">Parts &amp; stock</div>
+        <div class="sub">What&rsquo;s on the shelf &mdash; receive, use, count; low stock in red</div>
       </button>
       <button class="tile" onclick="go('stock')" id="tile-stock">
         <div class="big">Snacks &amp; water count</div>
@@ -493,14 +525,19 @@
       </div>
     </div>
 
+    <div id="j-clock"></div>
     <h2>What did you do?</h2>
     <div class="chips" id="j-work"></div>
     <input type="text" id="j-notes" placeholder="Notes / detail (optional)" style="margin-top:10px" autocomplete="off">
+    <div id="j-mins-wrap">
     <h2>How long?</h2>
     <div class="chips" id="j-mins"></div>
+    </div>
     <h2>Parts used</h2>
     <div class="chips" id="j-parts-chips"></div>
     <input type="text" id="j-parts" placeholder="Other parts (optional)" style="margin-top:10px" autocomplete="off">
+    <h2>Used from stock</h2>
+    <div id="j-stock"></div>
     <h2>Photo</h2>
     <input type="file" id="j-photo" accept="image/*" multiple class="hidden" onchange="photoPicked_('j', this)">
     <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('j-photo').click()">&#128247; Add photos (optional, up to 4) &mdash; damage, serial, before/after</button>
@@ -716,6 +753,26 @@
     <div id="fcd-body"></div>
   </section>
 
+
+  <!-- VEHICLES (B55) -->
+  <section id="view-veh" class="hidden">
+    <button class="back" onclick="vehBack_()">&#8249; Back</button>
+    <h2 id="veh-title">Vehicles</h2>
+    <div id="veh-list"></div>
+    <div id="veh-form" style="display:none"></div>
+  </section>
+
+  <!-- PARTS & STOCK (B55) -->
+  <section id="view-inv" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Parts &amp; stock</h2>
+    <input type="text" id="inv-q" placeholder="Search &mdash; e.g. tube, 12 speed, pads" oninput="renderInv_()" autocomplete="off">
+    <div class="chips" id="inv-cats" style="margin-top:8px"></div>
+    <p class="note" id="inv-sum"></p>
+    <div id="inv-list"></div>
+    <p class="note" style="margin-top:14px">Add, rename or remove items on the <b>Inventory</b> tab of the fleet sheet (item, category, unit, stock, reorder level, fits&hellip;). Every change made here is kept on <b>Inventory_Moves</b>.</p>
+  </section>
+
   <!-- TOUR HUB -->
   <section id="view-tour" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
@@ -805,7 +862,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycby9mu-4u76niASH-CiyDGMGUIgv7V-KsFy5yf302HXSUzbP--0sJ7qc9mM6gzsMBRer/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwuzLTdOQhvvUZxw1IrSpDj71pNLUiE0-EUABfWO8mTuc953uXlun53dXHnkL08wOex/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -818,7 +875,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B54';
+var UI_VERSION = 'B55';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -840,6 +897,8 @@ function paintSide_() {
     'tile-tour': !showOffice && !showWs,
     'tile-gdash': !showOffice && !showWs,
     'tile-stock': !showWs,
+    'tile-veh': true,
+    'tile-inv': showOffice || showWs,
     'tile-wq': showOffice || showWs,
     'tile-hist': showOffice || showWs,
     'tile-workshop': showOffice || showWs,
@@ -932,7 +991,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp','view-stock','view-flist','view-fc','view-fcd'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp','view-stock','view-flist','view-fc','view-fcd','view-veh','view-inv'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -2172,6 +2231,229 @@ function paintWqFc_() {
   box.innerHTML = fcCached_() && FC.ok ? fcReadyHtml_(fcShort_(3), true) : '';
 }
 
+/* ---- Timed bench jobs (B55) ---- */
+function timersFor_(aid) { return (DB.timers || []).filter(function(t){ return t.assetId === aid; }); }
+function myTimer_(aid) { return timersFor_(aid).filter(function(t){ return t.tech === user; })[0] || null; }
+function clockMins_(t) {
+  var now = Date.now(), p = t.pausedMs || 0;
+  if (t.state === 'Paused' && t.pausedAt) p += now - new Date(t.pausedAt).getTime();
+  return Math.max(0, Math.round((now - new Date(t.started).getTime() - p) / 60000));
+}
+function hm_(m) { return Math.floor(m / 60) + ':' + ('0' + (m % 60)).slice(-2); }
+function clockLine_(aid) {
+  var ts = timersFor_(aid);
+  return ts.length ? '<div class="meta" style="color:#1B7A3D">\u23f1 ' + ts.map(function(t){
+    return escH_(t.tech) + ' ' + hm_(clockMins_(t)) + (t.state === 'Paused' ? ' (paused)' : ''); }).join(' \u00b7 ') + '</div>' : '';
+}
+function paintClock_() {
+  var box = document.getElementById('j-clock'), b = current.bike;
+  if (!box || !b) return;
+  var t = myTimer_(b.assetId), others = timersFor_(b.assetId).filter(function(x){ return x.tech !== user; }), h = '';
+  if (t) {
+    h = '<div class="clock' + (t.state === 'Paused' ? ' paused' : '') + '"><div class="ct">' + (t.state === 'Paused' ? '\u23f8 Paused at ' : '\u23f1 On the clock ') +
+      '<b id="j-clock-t">' + hm_(clockMins_(t)) + '</b></div><div class="cm">Started ' + fmtWhen_(t.started) + ' \u00b7 ' + escH_(t.tech) + '</div>' +
+      '<div class="cb"><button class="quiet" onclick="clockOp_(\'' + (t.state === 'Paused' ? 'resume' : 'pause') + '\')">' +
+      (t.state === 'Paused' ? '\u25b6 Resume' : '\u23f8 Pause') + '</button><button class="quiet" onclick="clockOp_(\'cancel\')">Started by mistake</button></div>' +
+      '<label class="tq"><input type="checkbox" id="j-tq-on" onchange="paintTq_()"> Time is wrong (forgot to stop or pause)</label>' +
+      '<input type="text" id="j-tq" placeholder="Note for Tim / Quintin \u2014 what really happened?" style="display:none;margin-top:6px" oninput="jobSaveState()"></div>';
+  } else if (b.status === 'Workshop' || b.status === 'Pending') {
+    h = '<button class="primary clockgo" onclick="clockOp_(\'start\')">\u25b6 Start job \u2014 clock on</button>' +
+      '<p class="note" style="margin:6px 0 0">Bikes on the bench are timed: tap when you start, Pause for breaks, then log the job when it\u2019s done.</p>';
+  }
+  if (others.length) h += '<p class="note">Also on the clock: ' + others.map(function(x){ return escH_(x.tech) + ' ' + hm_(clockMins_(x)); }).join(', ') + '</p>';
+  box.innerHTML = h;
+  var wrap = document.getElementById('j-mins-wrap');
+  if (wrap) wrap.style.display = t ? 'none' : '';
+  document.getElementById('j-save').textContent = t ? 'Job done \u2014 stop clock & save' : 'Save job';
+  jobSaveState();
+}
+function paintTq_() {
+  var on = document.getElementById('j-tq-on').checked;
+  document.getElementById('j-tq').style.display = on ? '' : 'none';
+  jobSaveState();
+}
+function clockOp_(op) {
+  var b = current.bike, t = myTimer_(b.assetId);
+  if (op === 'cancel' && !confirm('Cancel this clock? Nothing gets logged for it.')) return;
+  TIMER_CALL({ op: op, code: b.barcode || current.code, row: t ? t.row : '' }, function(r){
+    if (r && r.denied) { toast('Workshop PIN needed \u2014 unlock on the home screen', true); return; }
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); return; }
+    DB.timers = (DB.timers || []).filter(function(x){ return x.row !== r.timer.row; });
+    if (r.timer.state === 'Running' || r.timer.state === 'Paused') DB.timers.push(r.timer);
+    if (r.status && r.status !== b.status) {
+      b.status = r.status;
+      (DB.bikes || []).forEach(function(x){ if (x.assetId === b.assetId) x.status = r.status; });
+      var p = statusPill_(b.status), pill = document.getElementById('j-pill');
+      pill.textContent = p.label; pill.className = 'pill ' + p.cls;
+    }
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    paintClock_();
+    toast(op === 'start' ? 'Clock on \u2014 ' + b.assetId : op === 'pause' ? 'Paused' : op === 'resume' ? 'Clock back on' : 'Clock cancelled');
+  }, function(){ toast('No signal \u2014 the clock didn\u2019t change. Try again.', true); });
+}
+setInterval(function(){
+  var el = document.getElementById('j-clock-t');
+  if (el && current.bike) { var t = myTimer_(current.bike.assetId); if (t) el.textContent = hm_(clockMins_(t)); }
+}, 20000);
+
+/* ---- Used from stock on a job (B55) ---- */
+var jobStock = [];
+function invItem_(name) { var it = null; (DB.inventory || []).forEach(function(x){ if (x.item === name) it = x; }); return it; }
+function paintJobStock_() {
+  var box = document.getElementById('j-stock');
+  if (!box) return;
+  if (!(DB.inventory || []).length) { box.innerHTML = '<p class="note">No stock list yet \u2014 items come from the Inventory tab.</p>'; return; }
+  box.innerHTML = jobStock.map(function(u, i){
+    var it = invItem_(u.item) || {};
+    return '<div class="stk"><div class="nm"><b>' + escH_(u.item) + '</b><small>' + (it.qty != null ? it.qty + ' ' + escH_(it.unit || '') + ' on the shelf' : '') + '</small></div>' +
+      '<div class="step"><button class="quiet" onclick="jsStep_(' + i + ', -1)">\u2212</button><input type="number" value="' + u.qty + '" readonly>' +
+      '<button class="quiet" onclick="jsStep_(' + i + ', 1)">+</button></div></div>';
+  }).join('') +
+  '<input type="text" id="j-stock-q" placeholder="Add from stock \u2014 search e.g. tube, chain, pads" oninput="jsSearch_()" autocomplete="off" style="margin-top:8px"><div id="j-stock-res"></div>';
+}
+function jsSearch_() {
+  var q = document.getElementById('j-stock-q').value.trim().toLowerCase(), box = document.getElementById('j-stock-res');
+  if (q.length < 2) { box.innerHTML = ''; return; }
+  var hits = (DB.inventory || []).filter(function(x){ return (x.item + ' ' + x.fits + ' ' + x.cat).toLowerCase().indexOf(q) !== -1; }).slice(0, 8);
+  box.innerHTML = hits.length ? hits.map(function(x){
+    return '<div class="mres" style="display:flex;justify-content:space-between;padding:8px 2px;border-bottom:1px solid var(--line);cursor:pointer" onclick="jsAdd_(\'' + jsq_(x.item) + '\')"><span>' +
+      escH_(x.item) + (x.fits ? ' <small style="color:var(--grey)">' + escH_(x.fits) + '</small>' : '') + '</span><span style="color:var(--grey);font-size:12px">' + x.qty + ' ' + escH_(x.unit) + '</span></div>';
+  }).join('') : '<p class="note">Nothing in stock matches.</p>';
+}
+function jsAdd_(item) {
+  var u = null; jobStock.forEach(function(x){ if (x.item === item) u = x; });
+  if (u) u.qty++; else jobStock.push({ item: item, qty: 1 });
+  paintJobStock_();
+}
+function jsStep_(i, d) {
+  jobStock[i].qty += d;
+  if (jobStock[i].qty <= 0) jobStock.splice(i, 1);
+  paintJobStock_();
+}
+
+/* ---- Vehicles (B55) ---- */
+var vehSel = null, vehPlace = '';
+function vehList_() { return (DB.vehicles && DB.vehicles.list) || []; }
+function vehBack_() { if (vehSel) { vehSel = null; renderVeh_(); } else go('home'); }
+function renderVeh_() {
+  document.getElementById('veh-title').textContent = 'Vehicles';
+  document.getElementById('veh-form').style.display = 'none';
+  var list = document.getElementById('veh-list');
+  list.style.display = '';
+  var V = vehList_();
+  list.innerHTML = V.length ? V.map(function(v){
+    var out = v.status === 'Out';
+    return '<div class="veh"><div class="vh"><span class="vn">' + escH_(v.name) + '</span><span class="vt ' + (out ? 'out' : 'in') + '">' + (out ? 'OUT' : 'IN') + '</span></div>' +
+      '<div class="vs">' + (out ? escH_(v.driver) + ' \u2192 ' + escH_(v.goingTo) + ' \u00b7 since ' + fmtWhen_(v.outSince) + ' \u00b7 out at ' + v.km + ' km'
+                              : (v.parkedAt ? 'At ' + escH_(v.parkedAt) : 'Parked') + (v.km ? ' \u00b7 ' + v.km + ' km' : '')) + '</div>' +
+      '<button class="' + (out ? 'primary' : 'quiet') + '" onclick="vehOpen_(\'' + jsq_(v.name) + '\')">' + (out ? 'Check in' : 'Check out') + '</button></div>';
+  }).join('') : '<p class="note">Loading vehicles\u2026</p>';
+}
+function vehOpen_(name) {
+  vehList_().forEach(function(v){ if (v.name === name) vehSel = v; });
+  if (!vehSel) return;
+  var out = vehSel.status === 'Out', places = (DB.vehicles && DB.vehicles.places) || [];
+  vehPlace = out ? 'Warehouse' : '';
+  document.getElementById('veh-title').textContent = (out ? 'Check in \u2014 ' : 'Check out \u2014 ') + vehSel.name;
+  document.getElementById('veh-list').style.display = 'none';
+  var f = document.getElementById('veh-form');
+  f.style.display = '';
+  f.innerHTML = '<p class="note">' + (out ? 'Out with ' + escH_(vehSel.driver) + ' since ' + fmtWhen_(vehSel.outSince) + ' at <b>' + vehSel.km + ' km</b>.'
+                                          : 'Last reading: <b>' + (vehSel.km || '\u2014') + ' km</b>' + (vehSel.parkedAt ? ' \u00b7 at ' + escH_(vehSel.parkedAt) : '')) + '</p>' +
+    '<h2>Km on the dashboard now</h2><input type="number" inputmode="numeric" id="veh-km" placeholder="e.g. ' + (vehSel.km || 120000) + '" oninput="vehState_()">' +
+    '<p class="note" id="veh-trip"></p>' +
+    '<h2>' + (out ? 'Where is it parked?' : 'Where is it going?') + '</h2><div class="chips" id="veh-places"></div>' +
+    '<input type="text" id="veh-other" placeholder="Somewhere else? Type it" oninput="vehPlace=this.value.trim();vehState_()" autocomplete="off" style="margin-top:8px">' +
+    '<input type="text" id="veh-note" placeholder="Note (optional) \u2014 fuel low, warning light, scratch\u2026" autocomplete="off" style="margin-top:10px">' +
+    '<div class="bar"><button class="quiet" onclick="vehBack_()">Cancel</button><button class="primary" id="veh-save" onclick="vehSave_()" disabled>' + (out ? 'Check in' : 'Check out') + '</button></div>';
+  pendChips_('veh-places', places.map(function(p){ return [p, p]; }), vehPlace, function(v){ vehPlace = v; document.getElementById('veh-other').value = ''; vehOpen2_(); });
+  vehState_();
+}
+function vehOpen2_() {
+  pendChips_('veh-places', ((DB.vehicles && DB.vehicles.places) || []).map(function(p){ return [p, p]; }), vehPlace,
+    function(v){ vehPlace = v; document.getElementById('veh-other').value = ''; vehOpen2_(); });
+  vehState_();
+}
+function vehState_() {
+  var km = Number(document.getElementById('veh-km').value), out = vehSel && vehSel.status === 'Out', trip = document.getElementById('veh-trip');
+  trip.textContent = out && km ? (km >= vehSel.km ? 'Trip: ' + (km - vehSel.km) + ' km' : 'Lower than when it went out \u2014 check the km') : '';
+  document.getElementById('veh-save').disabled = !(km > 0 && vehPlace);
+}
+function vehSave_() {
+  var out = vehSel.status === 'Out', km = Number(document.getElementById('veh-km').value), note = document.getElementById('veh-note').value.trim();
+  if (out && km - vehSel.km > 600 && !confirm((km - vehSel.km) + ' km for one trip \u2014 is the km right?')) return;
+  var btn = document.getElementById('veh-save');
+  btn.disabled = true;
+  VEH_CALL({ op: out ? 'in' : 'out', name: vehSel.name, km: km, place: vehPlace, note: note }, function(r){
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); vehState_(); return; }
+    DB.vehicles.list = r.vehicles;
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast(vehSel.name + (out ? ' checked in' + (r.trip != null ? ' \u2014 ' + r.trip + ' km trip' : '') : ' checked out to ' + vehPlace));
+    vehSel = null;
+    renderVeh_();
+  }, function(){ toast('Save failed \u2014 check signal', true); vehState_(); });
+}
+
+/* ---- Parts & stock (B55) ---- */
+var invCat = 'All', invOpen = null, invReason = 'Used';
+var INV_CAT_ORDER = ['Consumables', 'Tyres & tubes', 'Drivetrain', 'Brakes', 'Cables & housing', 'Wheels & hubs', 'Contact points',
+                     'E-bike parts', 'Hardware & bolts', 'Accessories', 'Tour kit', 'Tools'];
+function renderInv_() {
+  var items = DB.inventory || [], q = document.getElementById('inv-q').value.trim().toLowerCase();
+  var cats = {}; items.forEach(function(x){ cats[x.cat] = 1; });
+  var cl = Object.keys(cats).sort(function(a, b){
+    var ia = INV_CAT_ORDER.indexOf(a), ib = INV_CAT_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || (a < b ? -1 : 1);
+  });
+  var low = items.filter(function(x){ return x.reorder !== null && x.qty <= x.reorder; });
+  pendChips_('inv-cats', [['All', 'All'], ['Low', 'Low stock (' + low.length + ')']].concat(cl.map(function(c){ return [c, c]; })), invCat,
+    function(v){ invCat = v; renderInv_(); });
+  var list = items.filter(function(x){
+    return (invCat === 'All' || (invCat === 'Low' ? x.reorder !== null && x.qty <= x.reorder : x.cat === invCat)) &&
+      (!q || (x.item + ' ' + x.fits + ' ' + x.cat + ' ' + x.supplier).toLowerCase().indexOf(q) !== -1);
+  });
+  document.getElementById('inv-sum').textContent = items.length + ' items' + (low.length ? ' \u00b7 ' + low.length + ' at or below reorder level' : '');
+  document.getElementById('inv-list').innerHTML = list.map(function(x){
+    var isLow = x.reorder !== null && x.qty <= x.reorder, open = invOpen === x.item;
+    return '<div class="inv' + (isLow ? ' low' : '') + '"><div class="ih" onclick="invToggle_(\'' + jsq_(x.item) + '\')"><div><b>' + escH_(x.item) + '</b><br><span>' +
+      escH_([x.cat, x.fits, x.bin ? 'bin ' + x.bin : ''].filter(Boolean).join(' \u00b7 ')) + '</span></div><div class="iq">' + x.qty + ' ' + escH_(x.unit) +
+      (isLow ? '<br><span style="color:var(--red)">reorder at ' + x.reorder + '</span>' : '') + '</div></div>' +
+      (open ? '<div class="ip"><div class="chips" id="inv-reason"></div><input type="number" inputmode="numeric" id="inv-n" placeholder="' +
+        (invReason === 'Count' ? 'How many on the shelf now?' : 'How many?') + '"><input type="text" id="inv-bike" placeholder="Bike (optional) \u2014 e.g. BNW 14S" autocomplete="off"' +
+        (invReason === 'Used' ? '' : ' style="display:none"') + '><input type="text" id="inv-note" placeholder="Note (optional) \u2014 e.g. invoice no." autocomplete="off">' +
+        '<button class="primary" style="width:100%;margin-top:8px" onclick="invSave_()">Save</button></div>' : '') + '</div>';
+  }).join('') || '<p class="note">Nothing matches.</p>';
+  if (invOpen) pendChips_('inv-reason', [['Used', 'Used \u2212'], ['Received', 'Received +'], ['Count', 'Count (set)']], invReason,
+    function(v){ invReason = v; renderInv_(); });
+}
+function invToggle_(item) { invOpen = invOpen === item ? null : item; renderInv_(); }
+function invSave_() {
+  var n = document.getElementById('inv-n').value;
+  if (n === '' || Number(n) < 0) { toast('Type a number', true); return; }
+  STOCKMV_CALL({ item: invOpen, qty: Number(n), reason: invReason, bike: (document.getElementById('inv-bike') || {}).value || '',
+                 note: document.getElementById('inv-note').value.trim() }, function(r){
+    if (r && r.denied) { toast('Workshop PIN needed', true); return; }
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); return; }
+    (DB.inventory || []).forEach(function(x){ if (x.item === r.item) x.qty = r.qty; });
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast(r.item + ' \u2014 now ' + r.qty + (r.low ? ' (low \u2014 time to reorder)' : ''), r.low);
+    invOpen = null; renderInv_();
+  }, function(){ toast('Save failed \u2014 check signal', true); });
+}
+
+/* ---- Admin: correct a clocked time (B55) ---- */
+function rFix_(row, mins) {
+  var m = prompt('Correct minutes for this job (was ' + mins + '):', mins);
+  if (m === null || !(Number(m) > 0)) return;
+  var note = prompt('Why? (kept with the job)', '') || '';
+  TIMEFIX_CALL({ row: row, minutes: Number(m), note: note }, function(r){
+    if (r && r.denied) { toast('Management PIN needed', true); return; }
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code', true); return; }
+    toast('Time corrected to ' + r.minutes + ' min');
+    loadReport(reportDays);
+  }, function(){ toast('Save failed \u2014 check signal', true); });
+}
+
 function renderGreet_() {
   var el = document.getElementById('home-greet');
   if (!el) return;
@@ -2274,6 +2556,17 @@ function go(view) {
   } else if (view === 'gtask') {
     openGtask_();
     show('view-gtask');
+  } else if (view === 'veh') {
+    vehSel = null;
+    renderVeh_();
+    show('view-veh');
+    REFRESH_DATA(function(){ var v = document.getElementById('view-veh'); if (v && !v.classList.contains('hidden') && !vehSel) renderVeh_(); });
+  } else if (view === 'inv') {
+    invOpen = null;
+    document.getElementById('inv-q').value = '';
+    renderInv_();
+    show('view-inv');
+    REFRESH_DATA(function(){ var v = document.getElementById('view-inv'); if (v && !v.classList.contains('hidden') && !invOpen) renderInv_(); });
   } else if (view === 'fc') {
     fcCached_();
     renderFc_();
@@ -2508,7 +2801,7 @@ function renderWq_() {
         ragDot_(p, isAdmin ? 'cycleBikePrio_(\'' + jsq_(b.assetId) + '\')' : '') +
         '<div onclick="wqOpen_(\'' + jsq_(code) + '\')" style="cursor:pointer"><b>' + b.assetId + '</b> \u00b7 ' +
         KIND[it.k][1] + auto + '<div class="meta">' + (b.location || '?') + (t ? ' \u00b7 ' + t : '') + '</div>' + pendTag_(b) + problemTag_(b) +
-        extra + faultLine_(b.assetId) + headsLine_(b.assetId) + '</div></div>';
+        extra + faultLine_(b.assetId) + headsLine_(b.assetId) + clockLine_(b.assetId) + '</div></div>';
     });
   });
   if (!items.length) h += '<p class="note">Nothing needs attention \u2014 clean bench.</p>';
@@ -3438,6 +3731,9 @@ function openJob(b, hist) {
     job.parts = sel; jobSaveState();
   });
   outcomeChips_();
+  jobStock = [];
+  paintJobStock_();
+  paintClock_();
   jobSaveState();
   show('view-job');
 }
@@ -3479,6 +3775,8 @@ function multiChips(id, values, onChange) {
 function jobSaveState() {
   var ok = (job.work.length || document.getElementById('j-notes').value.trim()) && job.outcome;
   if (job.outcome === 'Waiting for parts' && !document.getElementById('j-partneed').value.trim()) ok = false;
+  var tqOn = document.getElementById('j-tq-on');
+  if (tqOn && tqOn.checked && !document.getElementById('j-tq').value.trim()) ok = false;
   document.getElementById('j-save').disabled = !ok;
 }
 function saveJob() {
@@ -3492,13 +3790,20 @@ function saveJob() {
   JOB_CALL({
     barcode: current.code, work: work, minutes: job.mins, parts: parts.join(', '),
     outcome: job.outcome, isService: isService, user: user, photo: photoBuf.j || '',
+    timerRow: (myTimer_(current.bike.assetId) || {}).row || '',
+    timeNote: (document.getElementById('j-tq-on') && document.getElementById('j-tq-on').checked) ? document.getElementById('j-tq').value.trim() : '',
+    stock: jobStock.slice(),
     partsNeeded: document.getElementById('j-partneed').value.trim()
   }, function(r){
     if (r.denied) { toast('Workshop PIN needed \u2014 unlock on the home screen', true); jobSaveState(); return; }
     if (r.notFound) { toast('Bike not found \u2014 rescan', true); return; }
     current.bike.status = job.outcome;
     if (isService) current.bike.lastService = new Date().toISOString();
-    toast(r.assetId + ' \u2014 job logged');
+    if (r.clocked) DB.timers = (DB.timers || []).filter(function(x){ return !(x.assetId === r.assetId && x.tech === user); });
+    jobStock.forEach(function(u){ var it = invItem_(u.item); if (it) it.qty -= u.qty; });
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast(r.assetId + ' \u2014 job logged' + (r.clocked ? ' \u00b7 ' + r.minutes + ' min on the clock' : '') +
+      (r.lowStock && r.lowStock.length ? ' \u00b7 low stock: ' + r.lowStock.join(', ') : ''), !!(r.lowStock && r.lowStock.length));
     go('workshop');
   }, function(){ toast('Save failed \u2014 check signal', true); jobSaveState(); });
 }
@@ -3530,6 +3835,10 @@ function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, u
 function PARTSDONE_CALL(rows, ok, err) { apiPost({ action: 'partsdone', rows: rows, user: user, pin: pin }, ok, err); }
 function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (staffCheck_()) return; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
+function TIMER_CALL(p, ok, err) { apiPost({ action: 'timer', op: p.op, code: p.code, row: p.row, user: user, pin: pin }, ok, err); }
+function TIMEFIX_CALL(p, ok, err) { apiPost({ action: 'timefix', row: p.row, minutes: p.minutes, note: p.note, user: user, pin: pin }, ok, err); }
+function VEH_CALL(p, ok, err) { apiPost({ action: 'vehicle', op: p.op, name: p.name, km: p.km, place: p.place, note: p.note, user: user }, ok, err); }
+function STOCKMV_CALL(p, ok, err) { apiPost({ action: 'stockmove', item: p.item, qty: p.qty, reason: p.reason, bike: p.bike, note: p.note, user: user, pin: pin }, ok, err); }
 function PROBLEM_CALL(p, ok, err) { p.action = 'problem'; p.user = user; apiPost(p, ok, err); }
 function FORECAST_CALL(force, ok, err) { apiPost({ action: 'forecast', force: !!force, user: user }, ok, err); }
 function FCADJ_CALL(p, ok, err) { apiPost({ action: 'fcadjust', date: p.date, site: p.site, type: p.type, change: p.change, note: p.note, user: user }, ok, err); }
@@ -3879,8 +4188,11 @@ function renderReport(jobs) {
     var d = new Date(j.when);
     var day = isNaN(d) ? '' : ('0'+d.getDate()).slice(-2) + '/' + ('0'+(d.getMonth()+1)).slice(-2) + ' ' + ('0'+d.getHours()).slice(-2) + ':' + ('0'+d.getMinutes()).slice(-2);
     lh += '<div class="move"><b>' + j.assetId + '</b> ' + (j.service ? '<span class="pill ready" style="font-size:10px;padding:2px 8px">service</span>' : '') +
+          (j.clocked ? ' <span class="pill" style="font-size:10px;padding:2px 8px;background:#E8F4EC;color:#1B7A3D">\u23f1 clocked</span>' : '') +
           '<div class="meta">' + j.work + (j.parts ? ' \u00b7 ' + j.parts : '') + '</div>' +
-          '<div class="meta">' + [j.by, j.mins ? j.mins + ' min' : '', day].filter(Boolean).join(' \u00b7 ') + '</div></div>';
+          '<div class="meta">' + [j.by, j.mins ? j.mins + ' min' : '', day].filter(Boolean).join(' \u00b7 ') + '</div>' +
+          (j.timeNote ? '<div class="meta" style="color:' + (/Corrected/.test(j.timeNote) ? 'var(--grey)' : 'var(--red)') + '">\u26a0 ' + escH_(j.timeNote) + '</div>' : '') +
+          (j.clocked && j.row ? '<a href="#" style="font-size:12px" onclick="rFix_(' + j.row + ', ' + j.mins + ');return false">correct time</a>' : '') + '</div>';
   });
   document.getElementById('r-list').innerHTML = lh || '<p class="note">No jobs logged in this period.</p>';
 }
