@@ -287,6 +287,40 @@
   .inv.low .iq { color:var(--red); }
   .inv .ip { margin-top:8px; }
   .inv .ip input { margin-top:6px; }
+  .welcome-h { font-size:15px; color:var(--grey); margin:4px 0 10px; }
+  .brands { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .bcard { border:2px solid var(--ink, #111); border-radius:10px; padding:14px 12px; text-align:left; background:#fff; cursor:pointer; min-height:88px; margin:0; }
+  .bcard .bn { font-weight:800; font-size:18px; line-height:1.15; }
+  .bcard .bs { font-size:12px; color:var(--grey); margin-top:4px; }
+  .bcard.bnw { border-color:var(--red); }
+  .bcard.bnw .bn { color:var(--red); }
+  .bcard.iride { border-color:#1F3A5F; }
+  .bcard.iride .bn { color:#1F3A5F; }
+  .bcard.soon { border-style:dashed; border-color:var(--line); cursor:default; opacity:.6; }
+  .bcard.wide { grid-column:1 / -1; min-height:0; }
+  .sect-h { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--grey); margin:18px 0 6px; }
+  .scanbar { display:flex; gap:8px; margin-top:6px; }
+  .scanbar button { margin:0; }
+  .scanbar .sb-main { flex:2; font-size:17px; padding:16px 10px; }
+  .scanbar .sb-side { flex:1; font-size:13px; padding:10px 8px; border-color:var(--red); color:var(--red); }
+  .hubtitle { display:flex; align-items:baseline; gap:8px; }
+  .hubtitle .bt { font-size:12px; color:var(--grey); }
+  details.more { margin-top:16px; border:1px solid var(--line); border-radius:8px; padding:4px 12px 10px; }
+  details.more summary { font-weight:700; padding:8px 0; cursor:pointer; }
+  .rsec { margin-top:12px; }
+  .rsec .rh { display:flex; justify-content:space-between; font-weight:700; font-size:14px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  .rsec .rh a { font-weight:400; font-size:12px; }
+  .rck { display:flex; gap:10px; align-items:flex-start; padding:7px 0; font-size:14px; cursor:pointer; }
+  .rck input { width:22px; height:22px; margin:0; flex-shrink:0; accent-color:#1B7A3D; }
+  .rck small { display:block; color:var(--grey); font-size:12px; }
+  .rprog { position:sticky; top:0; background:#fff; padding:6px 0; font-weight:700; z-index:2; }
+  .rent { padding:10px 2px; border-bottom:1px solid var(--line); }
+  .rent .rt { display:flex; justify-content:space-between; gap:8px; cursor:pointer; }
+  .rent .rt span { font-size:12px; color:var(--grey); text-align:right; }
+  .rent.late .rt span { color:var(--red); font-weight:700; }
+  .rent.today .rt span { color:#8A6510; font-weight:700; }
+  .fuelb { font-size:11px; font-weight:700; padding:2px 7px; border-radius:8px; background:#EEF; color:#334; margin-left:6px; }
+  .fuelb.urgent { background:var(--red); color:#fff; }
   table.parts { width:100%; border-collapse:collapse; margin-top:10px; }
   table.parts th, table.parts td { border:1px solid var(--line); padding:8px 6px; font-size:12px; text-align:left; vertical-align:top; }
   table.parts th { font-family:'Montserrat',sans-serif; font-weight:800; font-size:10px; background:#F5F5F5; }
@@ -336,85 +370,224 @@
   </section>
 
   <!-- HOME -->
-  <section id="view-home" class="hidden">
+  <section id="view-welcome" class="hidden">
     <div id="home-greet"></div>
-    <div class="tiles">
-      <button class="tile" onclick="go('lookup')" id="tile-lookup">
-        <div class="big">Check a bike</div>
-        <div class="sub">Scan or search &mdash; status, faults, report a problem</div>
-      </button>
-      <button class="tile" onclick="go('rp')" id="tile-rp">
-        <div class="big">Report a bike problem</div>
-        <div class="sub">Something wrong, or worth knowing &mdash; add a photo</div>
-      </button>
-      <button class="tile" onclick="go('fc')" id="tile-fc">
-        <div class="big">Bike forecast</div>
-        <div class="sub">Bikes needed per day from the manifest &mdash; up or down per site</div>
-      </button>
-      <button class="tile" onclick="go('flist')" id="tile-flist">
-        <div class="big">Faults &amp; heads-ups</div>
-        <div class="sub">Every open fault and heads-up &mdash; who logged it, when, photos</div>
-      </button>
-      <button class="tile" onclick="go('mv')" id="tile-move">
-        <div class="big">Move bikes</div>
-        <div class="sub">Pick a site, then scan bike after bike &mdash; each scan moves one</div>
-      </button>
+    <p class="welcome-h">Welcome<span id="wel-name"></span> &mdash; pick a brand</p>
+    <div class="brands">
+      <button class="bcard bnw" onclick="openBrand_('bnw')"><div class="bn">Bikes &rsquo;n Wines</div><div class="bs">Wine-route cycle tours</div></button>
+      <button class="bcard iride" id="bc-iride" onclick="openBrand_('iride')"><div class="bn">iRide</div><div class="bs">Road &amp; gravel rentals</div></button>
+      <button class="bcard soon" disabled><div class="bn">Cape Town Kayaks</div><div class="bs">coming soon</div></button>
+      <button class="bcard soon" disabled><div class="bn">Cape Town Hiking</div><div class="bs">coming soon</div></button>
+      <button class="bcard soon" disabled><div class="bn">Cape Footprints</div><div class="bs">coming soon</div></button>
+    </div>
+    <p class="note" id="progress"></p>
+    <p class="note" id="role-note"></p>
+  </section>
+
+  <section id="view-home" class="hidden">
+    <button class="back" onclick="go('welcome')">&#8249; Brands</button>
+    <h2 class="hubtitle" id="home-title">Bikes &rsquo;n Wines</h2>
+    <p class="welcome-h">What are you doing today?</p>
+    <div class="brands">
+      <button class="bcard wide" onclick="openArea_('guide')" id="ar-guide"><div class="bn" id="ar-guide-n">Guide</div><div class="bs" id="ar-guide-s">Tour bikes out &amp; in &middot; where are the bikes &middot; forecast &middot; snacks &amp; water</div></button>
+      <button class="bcard wide" onclick="openArea_('ws')" id="ar-ws"><div class="bn">Workshop &#128274;</div><div class="bs">To do &middot; log work &middot; tasks &middot; parts &amp; stock &middot; order parts</div></button>
+      <button class="bcard wide" onclick="openArea_('office')" id="ar-office"><div class="bn">Office / Admin &#128274;</div><div class="bs" id="ar-office-s">Fleet dashboard &middot; faults &middot; workshop report &middot; forecast &middot; barcodes</div></button>
+      <button class="bcard wide" onclick="openArea_('veh')" id="ar-veh"><div class="bn">Vehicles</div><div class="bs">Bakkie, Ford, NV, Quantum &mdash; check out &amp; in, km, fuel</div></button>
+    </div>
+    <p class="note" id="progress2"></p>
+  </section>
+
+  <section id="view-hub-guide" class="hidden">
+    <button class="back" onclick="hubBack_()">&#8249; Back</button>
+    <h2 class="hubtitle">Guide <span class="bt" id="hubbrand-guide"></span></h2>
+    <div class="scanbar">
+      <button class="primary sb-main" onclick="go('lookup')">&#128269; Scan or find a bike</button>
+      <button class="quiet sb-side" onclick="go('rp')">&#9888; Report a problem</button>
+    </div>
+    <p class="note" id="progress3"></p>
+    <div class="tiles" style="margin-top:10px">
       <button class="tile" onclick="go('tour')" id="tile-tour">
         <div class="big">Tour bikes</div>
         <div class="sub">Scan bikes out for your tour &mdash; and back in after</div>
-      </button>
-      <button class="tile" onclick="go('veh')" id="tile-veh">
-        <div class="big">Vehicles</div>
-        <div class="sub">Bakkie, Ford, NV, Quantum &mdash; check out and in with km</div>
-      </button>
-      <button class="tile" onclick="requireRole('workshop','inv')" id="tile-inv">
-        <div class="big">Parts &amp; stock</div>
-        <div class="sub">What&rsquo;s on the shelf &mdash; receive, use, count; low stock in red</div>
-      </button>
-      <button class="tile" onclick="go('stock')" id="tile-stock">
-        <div class="big">Snacks &amp; water count</div>
-        <div class="sub">End of the day &mdash; count what&rsquo;s left, tick what needs ordering</div>
       </button>
       <button class="tile" onclick="go('gd')" id="tile-gdash">
         <div class="big">Where are the bikes?</div>
         <div class="sub">Ready bikes by size at each site, pending checks, what&rsquo;s out</div>
       </button>
-      <button class="tile" onclick="go('hpick')" id="tile-hist">
-        <div class="big">Bike history</div>
-        <div class="sub">Search or scan any bike &mdash; tours, workshop jobs, faults, moves</div>
+      <button class="tile" onclick="go('fc')" id="tile-fc">
+        <div class="big">Bike forecast</div>
+        <div class="sub">Bikes needed per day from the manifest &mdash; up or down per site</div>
       </button>
+      <button class="tile" onclick="go('stock')" id="tile-stock">
+        <div class="big">Snacks &amp; water count</div>
+        <div class="sub">End of the day &mdash; count what&rsquo;s left, tick what needs ordering</div>
+      </button>
+      <button class="tile" onclick="go('mv')" id="tile-move">
+        <div class="big">Move bikes</div>
+        <div class="sub">Pick a site, then scan bike after bike &mdash; each scan moves one</div>
+      </button>
+    </div>
+  </section>
+
+  <section id="view-hub-rent" class="hidden">
+    <button class="back" onclick="hubBack_()">&#8249; Back</button>
+    <h2 class="hubtitle">Rentals <span class="bt" id="hubbrand-rent"></span></h2>
+    <div class="scanbar">
+      <button class="primary sb-main" onclick="go('lookup')">&#128269; Scan or find a bike</button>
+      <button class="quiet sb-side" onclick="go('rp')">&#9888; Report a problem</button>
+    </div>
+    <div class="tiles" style="margin-top:10px">
+      <button class="tile" onclick="openRent_()" id="sc-rent">
+        <div class="big">Rent a bike out</div>
+        <div class="sub">Pre-rental checklist, client &amp; contract &mdash; then the bike goes out</div>
+      </button>
+      <button class="tile" onclick="go('rentals')" id="sc-rentals">
+        <div class="big">Rentals out &amp; returns <span id="sc-rentals-n" style="font-size:14px"></span></div>
+        <div class="sub">Who has which bike, due back, overdue &mdash; check bikes back in</div>
+      </button>
+      <button class="tile" onclick="openFleet_('iRide')" id="sc-ifleet">
+        <div class="big">iRide fleet</div>
+        <div class="sub">% ready, road &amp; gravel, by size &mdash; iRide bikes only</div>
+      </button>
+    </div>
+  </section>
+
+  <section id="view-hub-ws" class="hidden">
+    <button class="back" onclick="hubBack_()">&#8249; Back</button>
+    <h2 class="hubtitle">Workshop <span class="bt" id="hubbrand-ws"></span></h2>
+    <div class="scanbar">
+      <button class="primary sb-main" onclick="go('lookup')">&#128269; Scan or find a bike</button>
+      <button class="quiet sb-side" onclick="go('rp')">&#9888; Report a problem</button>
+    </div>
+    <div class="tiles" style="margin-top:10px">
       <button class="tile" onclick="requireRole('workshop','wq')" id="tile-wq">
-        <div class="big">Bikes needing attention <span class="lock">&#128274;</span></div>
+        <div class="big">To do &mdash; bikes needing attention <span class="lock">&#128274;</span></div>
         <div class="sub">The work queue &mdash; what to pick up next</div>
       </button>
       <button class="tile" onclick="requireRole('workshop','workshop')" id="tile-workshop">
         <div class="big">Log workshop work <span class="lock">&#128274;</span></div>
         <div class="sub">Scan the bike, record what you did and what you used</div>
       </button>
-      <button class="tile" onclick="requireRole('workshop','order')" id="tile-order">
-        <div class="big">Order parts <span class="lock">&#128274;</span></div>
-        <div class="sub">Parts the workshop needs — emailed daily until received</div>
-      </button>
       <button class="tile" onclick="requireRole('workshop','wtasks')" id="tile-wtasks">
         <div class="big">Tasks to complete <span class="lock">&#128274;</span></div>
         <div class="sub">Written jobs for the workshop &mdash; tick off when done</div>
       </button>
-      <button class="tile" onclick="requireRole('admin','dash')" id="tile-dash">
-        <div class="big">Location dashboard <span class="lock">&#128274;</span></div>
-        <div class="sub">Live counts by site and status</div>
+      <button class="tile" onclick="go('hpick')" id="tile-hist">
+        <div class="big">Bike history</div>
+        <div class="sub">Search or scan any bike &mdash; tours, workshop jobs, faults, moves</div>
+      </button>
+      <button class="tile" onclick="requireRole('workshop','inv')" id="tile-inv">
+        <div class="big">Parts &amp; stock</div>
+        <div class="sub">What&rsquo;s on the shelf &mdash; receive, use, count; low stock in red</div>
+      </button>
+      <button class="tile" onclick="requireRole('workshop','order')" id="tile-order">
+        <div class="big">Order parts <span class="lock">&#128274;</span></div>
+        <div class="sub">Parts the workshop needs &mdash; emailed daily until received</div>
+      </button>
+    </div>
+  </section>
+
+  <section id="view-hub-office" class="hidden">
+    <button class="back" onclick="hubBack_()">&#8249; Back</button>
+    <h2 class="hubtitle">Office / Admin <span class="bt" id="hubbrand-office"></span></h2>
+    <div class="scanbar">
+      <button class="primary sb-main" onclick="go('lookup')">&#128269; Scan or find a bike</button>
+      <button class="quiet sb-side" onclick="go('rp')">&#9888; Report a problem</button>
+    </div>
+    <div class="tiles" style="margin-top:10px">
+      <button class="tile" onclick="openFleet_(brandFleet_())" id="tile-dash">
+        <div class="big">Fleet dashboard <span class="lock">&#128274;</span></div>
+        <div class="sub">This brand only &mdash; % ready, by site, size and status</div>
+      </button>
+      <button class="tile" onclick="fl.fleet=brandFleet_();go('flist')" id="tile-flist">
+        <div class="big">Faults &amp; heads-ups</div>
+        <div class="sub">Every open fault and heads-up &mdash; who logged it, when, photos</div>
+      </button>
+      <button class="tile" onclick="go('rentals')" id="of-rentals">
+        <div class="big">Rentals out &amp; returns </div>
+        <div class="sub">Who has which bike, due back, overdue &mdash; check bikes back in</div>
       </button>
       <button class="tile" onclick="requireRole('admin','report')" id="tile-report">
         <div class="big">Workshop report <span class="lock">&#128274;</span></div>
         <div class="sub">Jobs done, minutes, services &mdash; by day and by tech</div>
       </button>
+      <button class="tile" onclick="go('fc')" id="mg-fc">
+        <div class="big">Bike forecast</div>
+        <div class="sub">Bikes needed per day from the manifest &mdash; up or down per site</div>
+      </button>
+      <button class="tile" onclick="go('hpick')" id="of-hist">
+        <div class="big">Bike history</div>
+        <div class="sub">Search or scan any bike &mdash; tours, workshop jobs, faults, moves</div>
+      </button>
+      <button class="tile" onclick="requireRole('workshop','inv')" id="of-inv">
+        <div class="big">Parts &amp; stock</div>
+        <div class="sub">What&rsquo;s on the shelf &mdash; receive, use, count; low stock in red</div>
+      </button>
+      <button class="tile" onclick="requireRole('workshop','order')" id="of-order">
+        <div class="big">Order parts <span class="lock">&#128274;</span></div>
+        <div class="sub">Parts the workshop needs &mdash; emailed daily until received</div>
+      </button>
+      <button class="tile" onclick="setIpin_()" id="of-ipin">
+        <div class="big">Set iRide PIN</div>
+        <div class="sub">The PIN the iRide team uses to open iRide &mdash; change it when someone leaves</div>
+      </button>
       <button class="tile" onclick="requireRole('admin','assign')" id="tile-assign">
         <div class="big">Assign barcodes <span class="lock">&#128274;</span></div>
-        <div class="sub">Tagging day — scan a sticker, pick the bike</div>
+        <div class="sub">Tagging day &mdash; scan a sticker, pick the bike</div>
       </button>
     </div>
-    <p class="note" id="role-note"></p>
-    <p class="note" id="progress"></p>
   </section>
+
+  <!-- iRIDE RENTALS (B56) -->
+  <section id="view-rent" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Rent a bike out</h2>
+    <div id="rent-pick">
+      <div class="manual" style="margin-top:6px">
+        <input type="text" id="rent-q" autocomplete="off" placeholder="Bike &mdash; e.g. iRide 25M" oninput="rentList_()">
+        <button class="primary" onclick="go('rent-scan')">Scan</button>
+      </div>
+      <p class="note">Ready-to-ride iRide bikes:</p>
+      <div id="rent-list"></div>
+    </div>
+    <div id="rent-form" style="display:none">
+      <div class="card"><div class="num" id="rent-num"></div><div class="meta" id="rent-meta"></div>
+        <a href="#" onclick="openRent_();return false" style="font-size:13px">change bike</a></div>
+      <h2>Client</h2>
+      <input type="text" id="rent-client" placeholder="Client name &mdash; as on the contract" autocomplete="off" oninput="rentState_()">
+      <input type="text" id="rent-contact" placeholder="Phone or email (optional)" autocomplete="off" style="margin-top:8px">
+      <h2>Dates</h2>
+      <div style="display:flex;gap:8px"><label style="flex:1;font-size:12px">Start<input type="date" id="rent-start" onchange="rentState_()"></label>
+        <label style="flex:1;font-size:12px">Due back<input type="date" id="rent-due" onchange="rentState_()"></label></div>
+      <p class="note" id="rent-days"></p>
+      <h2>Handover</h2>
+      <div class="chips" id="rent-hand"></div>
+      <h2>Pre-rental checklist <span id="rent-count" style="font-size:14px;color:var(--grey)"></span></h2>
+      <p class="note">Same as the paper iRide Africa checklist. Every item must be ticked before the bike can go out &mdash; if something fails, fix it or report a problem instead.</p>
+      <div id="rent-checks"></div>
+      <h2>Pedals fitted</h2>
+      <div class="chips" id="rent-pedals"></div>
+      <input type="text" id="rent-special" placeholder="Special requests (optional) &mdash; e.g. bar bag, bottle" autocomplete="off" style="margin-top:8px">
+      <h2>Contract</h2>
+      <label class="rck"><input type="checkbox" id="rent-signed" onchange="rentState_()"><span><b>Rental contract signed by the client</b><small>Client signs on handover that all is in order</small></span></label>
+      <input type="file" id="rc-photo" accept="image/*" multiple class="hidden" onchange="photoPicked_('rc', this)">
+      <button class="quiet" style="width:100%;margin-top:6px" onclick="document.getElementById('rc-photo').click()">&#128247; Photo of the signed contract (optional)</button>
+      <p class="note" id="rc-photo-note"></p>
+      <div class="bar">
+        <button class="quiet" onclick="go('home')">Cancel</button>
+        <button class="primary" id="rent-save" onclick="rentSave_()" disabled>Release bike</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-rentals" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2>Rentals out &amp; returns</h2>
+    <div id="rentals-out"></div>
+    <h2 style="margin-top:18px">Recently returned</h2>
+    <div id="rentals-done"></div>
+  </section>
+
 
   <!-- SCAN (shared) -->
   <section id="view-scan" class="hidden">
@@ -463,6 +636,7 @@
   <!-- DASHBOARD -->
   <section id="view-dash" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
+    <div class="chips" id="d-fleet"></div>
 
     <div class="card" style="margin-top:6px">
       <div class="k-label">Fleet ready right now</div>
@@ -533,6 +707,7 @@
     <h2>How long?</h2>
     <div class="chips" id="j-mins"></div>
     </div>
+    <details class="more" id="j-more"><summary>&#65291; Parts, stock &amp; photos</summary>
     <h2>Parts used</h2>
     <div class="chips" id="j-parts-chips"></div>
     <input type="text" id="j-parts" placeholder="Other parts (optional)" style="margin-top:10px" autocomplete="off">
@@ -542,6 +717,7 @@
     <input type="file" id="j-photo" accept="image/*" multiple class="hidden" onchange="photoPicked_('j', this)">
     <button class="quiet" style="width:100%;margin-top:10px" onclick="document.getElementById('j-photo').click()">&#128247; Add photos (optional, up to 4) &mdash; damage, serial, before/after</button>
     <p class="note" id="j-photo-note"></p>
+    </details>
     <h2>Where does it stand now?</h2>
     <div class="chips" id="j-outcome"></div>
     <div id="j-partneed-wrap" style="display:none">
@@ -606,6 +782,7 @@
   <section id="view-wq" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
     <h2>Bikes needing attention</h2>
+    <div class="chips" id="wq-fleet"></div>
     <div id="wq-fc"></div>
     <p class="note">What to pick up next. Tap a bike to open its job card and log the work &mdash; or tick it when it&rsquo;s sorted and clear several at once.</p>
     <div id="wq-list"></div>
@@ -730,7 +907,8 @@
   <section id="view-flist" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
     <h2>Faults &amp; heads-ups</h2>
-    <div class="chips" id="fl-kind"></div>
+    <div class="chips" id="fl-fleet"></div>
+    <div class="chips" id="fl-kind" style="margin-top:6px"></div>
     <div class="chips" id="fl-who" style="margin-top:6px"></div>
     <p class="note" id="fl-sum" style="margin-top:8px"></p>
     <div id="fl-list"></div>
@@ -862,7 +1040,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwuzLTdOQhvvUZxw1IrSpDj71pNLUiE0-EUABfWO8mTuc953uXlun53dXHnkL08wOex/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwd8RhCP6JInwa2wC0pX_BhX9u5CMYEs5vM207wdBanDPA5dJxR5lxhO7FEjAmUhXh3/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -875,7 +1053,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B55';
+var UI_VERSION = 'B58';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -943,20 +1121,19 @@ function paintRoles_() {
   if (a) a.className = 'tile' + (roleRank_(role) >= 2 ? ' open' : '');
   var n = document.getElementById('role-note');
   if (n) {
-    var base = side === 'guide' ? 'Guide'
-      : role === 'guide' ? (side === 'workshop' ? 'Workshop' : 'Office') + ' &middot; locked tiles need a PIN'
+    var base = role === 'guide' ? (side === 'workshop' ? 'Workshop' : 'Office') + ' &middot; locked tiles need a PIN'
       : role === 'workshop' ? 'Workshop access &middot; <a href="#" onclick="lockDown();return false">lock</a>'
       : 'Management access &middot; <a href="#" onclick="lockDown();return false">lock</a>';
     var sv = DB.version || '?';
     var mism = (sv !== UI_VERSION) ? ' <b style="color:var(--red)">&mdash; server outdated, redeploy Code.gs</b>' : '';
-    n.innerHTML = base + ' &middot; <a href="#" onclick="switchSide();return false">switch</a>' +
+    n.innerHTML = (roleRank_(role) >= 1 ? base : 'Guide') +
       ' &middot; app ' + UI_VERSION + ' / server ' + sv + mism;
   }
 }
 function pickPerson_(nm, needs) {
   var done = function(){
     user = nm; localStorage.setItem('cab_user', nm);
-    if (side) go('home'); else show('view-side');
+    go('home');
   };
   if (!needs) { done(); return; }
   var c = window.prompt('Code for ' + nm + ':');
@@ -977,8 +1154,9 @@ function switchSide() {
   show('view-side');
 }
 function lockDown() {
-  role = 'guide'; pin = '';
-  localStorage.removeItem('cab_role'); localStorage.removeItem('cab_pin');
+  role = 'guide'; pin = ''; ipin = '';
+  localStorage.removeItem('cab_role'); localStorage.removeItem('cab_pin'); localStorage.removeItem('cab_ipin');
+  if (brand === 'iride') { brand = ''; hub = ''; }
   paintRoles_(); toast('Locked');
 }
 var mode = 'assign';          // 'assign' | 'lookup'
@@ -991,7 +1169,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp','view-stock','view-flist','view-fc','view-fcd','view-veh','view-inv'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp','view-stock','view-flist','view-fc','view-fcd','view-veh','view-inv','view-welcome','view-hub-guide','view-hub-rent','view-hub-ws','view-hub-office','view-rent','view-rentals'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -1010,7 +1188,7 @@ function paintPeople_() {
   });
 }
 function landing_() {
-  if (user && side) go('home'); else if (user) show('view-side'); else show('view-who');
+  if (user) go('home'); else show('view-who');
 }
 /* ---- Staff list lockout (B31) ---- */
 /* ---- Home greetings, birthdays and Hennie (B32) ---- */
@@ -1438,7 +1616,7 @@ function renderGd_() {
     function(v){ gdSite = v; renderGd_(); });
   var all = gdSite === 'All sites';
   var here = function(b){ return all || b.location === gdSite; };
-  var bikes = activeBikes_().filter(function(b){ return b.status !== 'Guide bike'; });
+  var bikes = activeBikes_().filter(function(b){ return b.status !== 'Guide bike' && fleetOf_(b) === 'BnW'; });
 
   // ready to ride, by type and size
   var ready = bikes.filter(function(b){ return b.status === 'Available' && here(b); });
@@ -1666,7 +1844,7 @@ function hpSearch_() {
   var q = document.getElementById('hp-q').value.trim(), nq = normCode_(q), box = document.getElementById('hp-res');
   if (q.length < 2 || !nq) { box.innerHTML = ''; return; }
   var hits = (DB.bikes || []).filter(function(b){
-    return normCode_(b.assetId).indexOf(nq) !== -1 || String(b.barcode || '').indexOf(q) === 0;
+    return inBrand_(b) && (normCode_(b.assetId).indexOf(nq) !== -1 || String(b.barcode || '').indexOf(q) === 0);
   }).slice(0, 10);
   box.innerHTML = hits.length
     ? hits.map(function(b){ return hpRow_(b, (STATUS_LABELS[b.status] || b.status || '') + (b.location ? ' &middot; ' + b.location : '')); }).join('')
@@ -1675,7 +1853,7 @@ function hpSearch_() {
 function renderHpick_() {
   document.getElementById('hp-q').value = '';
   document.getElementById('hp-res').innerHTML = '';
-  var probs = (DB.bikes || []).filter(function(b){ return b.problem && b.active !== 'No'; });
+  var probs = (DB.bikes || []).filter(function(b){ return b.problem && b.active !== 'No' && inBrand_(b); });
   document.getElementById('hp-prob').innerHTML = probs.length
     ? '<h2 style="color:var(--red)">\u2691 Problem bikes (' + probs.length + ')</h2>' +
       probs.map(function(b){ return hpRow_(b, '<span style="color:var(--red)">' + b.problem + '</span>'); }).join('')
@@ -1683,7 +1861,7 @@ function renderHpick_() {
 }
 
 /* ---- Photos, heads-up notes, report a bike problem (B45) ---- */
-var photoBuf = { rp: '', f: '', j: '' };
+var photoBuf = { rp: '', f: '', j: '', rc: '', fs: '' };
 var MAX_PHOTOS = 4;
 function photoList_(key) { return String(photoBuf[key] || '').split('|').filter(Boolean); }
 function shrinkPhoto_(f, done) {
@@ -1807,7 +1985,7 @@ function rpSearch_() {
   var q = document.getElementById('rp-q').value.trim(), nq = normCode_(q), box = document.getElementById('rp-res');
   if (q.length < 2 || !nq) { box.innerHTML = ''; return; }
   var hits = (DB.bikes || []).filter(function(b){
-    return b.active !== 'No' && (normCode_(b.assetId).indexOf(nq) !== -1 || String(b.barcode || '').indexOf(q) === 0);
+    return b.active !== 'No' && inBrand_(b) && (normCode_(b.assetId).indexOf(nq) !== -1 || String(b.barcode || '').indexOf(q) === 0);
   }).slice(0, 10);
   box.innerHTML = hits.length
     ? hits.map(function(b){
@@ -2044,7 +2222,9 @@ function renderFlist_() {
   if (fl.who && !people[fl.who]) fl.who = '';
   pendChips_('fl-who', [['', 'Everyone']].concat(names.map(function(n){ return [n, n + ' (' + people[n] + ')']; })), fl.who,
     function(v){ fl.who = v; renderFlist_(); });
-  var list = all.filter(function(x){ return (fl.kind === 'all' || x.k === fl.kind) && (!fl.who || x.by === fl.who); });
+  pendChips_('fl-fleet', [['All', 'All brands'], ['BnW', 'Bikes \u2019n Wines'], ['iRide', 'iRide']], fl.fleet || 'All', function(v){ fl.fleet = v; renderFlist_(); });
+  var list = all.filter(function(x){ return (fl.kind === 'all' || x.k === fl.kind) && (!fl.who || x.by === fl.who) &&
+    (!fl.fleet || fl.fleet === 'All' || fleetOf_(x.b) === fl.fleet); });
   var today = isoDay_(new Date()), nToday = list.filter(function(x){ return isoDay_(new Date(x.when)) === today; }).length;
   document.getElementById('fl-sum').textContent = list.length
     ? list.length + ' open' + (nToday ? ' \u00b7 ' + nToday + ' logged today' : '') + ' \u2014 tap one to open the bike'
@@ -2228,7 +2408,7 @@ function fcCached_() {
 function paintWqFc_() {
   var box = document.getElementById('wq-fc');
   if (!box) return;
-  box.innerHTML = fcCached_() && FC.ok ? fcReadyHtml_(fcShort_(3), true) : '';
+  box.innerHTML = fcCached_() && FC.ok && wqFleet !== 'iRide' ? fcReadyHtml_(fcShort_(3), true) : '';
 }
 
 /* ---- Timed bench jobs (B55) ---- */
@@ -2334,7 +2514,7 @@ function jsStep_(i, d) {
 /* ---- Vehicles (B55) ---- */
 var vehSel = null, vehPlace = '';
 function vehList_() { return (DB.vehicles && DB.vehicles.list) || []; }
-function vehBack_() { if (vehSel) { vehSel = null; renderVeh_(); } else go('home'); }
+function vehBack_() { if (vehSel) { vehSel = null; vehFuelOnly = false; renderVeh_(); } else go('home'); }
 function renderVeh_() {
   document.getElementById('veh-title').textContent = 'Vehicles';
   document.getElementById('veh-form').style.display = 'none';
@@ -2344,16 +2524,18 @@ function renderVeh_() {
   list.innerHTML = V.length ? V.map(function(v){
     var out = v.status === 'Out';
     return '<div class="veh"><div class="vh"><span class="vn">' + escH_(v.name) + '</span><span class="vt ' + (out ? 'out' : 'in') + '">' + (out ? 'OUT' : 'IN') + '</span></div>' +
+      (v.fuel ? '<div style="margin-top:4px">' + fuelBadge_(v.fuel) + (v.fuelMonth ? ' <small style="color:var(--grey)">fuel this month R' + v.fuelMonth + '</small>' : '') + '</div>' : '') +
       '<div class="vs">' + (out ? escH_(v.driver) + ' \u2192 ' + escH_(v.goingTo) + ' \u00b7 since ' + fmtWhen_(v.outSince) + ' \u00b7 out at ' + v.km + ' km'
                               : (v.parkedAt ? 'At ' + escH_(v.parkedAt) : 'Parked') + (v.km ? ' \u00b7 ' + v.km + ' km' : '')) + '</div>' +
-      '<button class="' + (out ? 'primary' : 'quiet') + '" onclick="vehOpen_(\'' + jsq_(v.name) + '\')">' + (out ? 'Check in' : 'Check out') + '</button></div>';
+      '<button class="' + (out ? 'primary' : 'quiet') + '" onclick="vehOpen_(\'' + jsq_(v.name) + '\')">' + (out ? 'Check in' : 'Check out') + '</button>' +
+      '<button class="quiet" style="margin-top:6px;font-size:13px;padding:8px" onclick="vehFuelOpen_(\'' + jsq_(v.name) + '\')">\u26fd I added fuel</button></div>';
   }).join('') : '<p class="note">Loading vehicles\u2026</p>';
 }
 function vehOpen_(name) {
   vehList_().forEach(function(v){ if (v.name === name) vehSel = v; });
   if (!vehSel) return;
   var out = vehSel.status === 'Out', places = (DB.vehicles && DB.vehicles.places) || [];
-  vehPlace = out ? 'Warehouse' : '';
+  vehPlace = out ? 'Warehouse' : ''; vehFuel = ''; vehFuelAdd = false; vehFuelOnly = false; photoBuf.fs = '';
   document.getElementById('veh-title').textContent = (out ? 'Check in \u2014 ' : 'Check out \u2014 ') + vehSel.name;
   document.getElementById('veh-list').style.display = 'none';
   var f = document.getElementById('veh-form');
@@ -2364,10 +2546,19 @@ function vehOpen_(name) {
     '<p class="note" id="veh-trip"></p>' +
     '<h2>' + (out ? 'Where is it parked?' : 'Where is it going?') + '</h2><div class="chips" id="veh-places"></div>' +
     '<input type="text" id="veh-other" placeholder="Somewhere else? Type it" oninput="vehPlace=this.value.trim();vehState_()" autocomplete="off" style="margin-top:8px">' +
+    '<h2>Fuel in the tank now</h2><div class="chips" id="veh-fl"></div>' +
+    '<label class="rck" style="margin-top:8px"><input type="checkbox" id="veh-fadd" onchange="vehFuelAdd=this.checked;document.getElementById(\'veh-fbox\').style.display=this.checked?\'\':\'none\';vehState_()"><span>I added fuel on this trip</span></label>' +
+    '<div id="veh-fbox" style="display:none"><input type="number" inputmode="decimal" id="veh-fr" placeholder="Amount spent (R)" oninput="vehState_()">' +
+    '<input type="file" id="fs-photo" accept="image/*" class="hidden" onchange="photoPicked_(\'fs\', this);setTimeout(vehState_, 800)">' +
+    '<button class="quiet" style="width:100%;margin-top:6px" onclick="document.getElementById(\'fs-photo\').click()">&#128247; Photo of the slip</button><p class="note" id="fs-photo-note"></p></div>' +
     '<input type="text" id="veh-note" placeholder="Note (optional) \u2014 fuel low, warning light, scratch\u2026" autocomplete="off" style="margin-top:10px">' +
     '<div class="bar"><button class="quiet" onclick="vehBack_()">Cancel</button><button class="primary" id="veh-save" onclick="vehSave_()" disabled>' + (out ? 'Check in' : 'Check out') + '</button></div>';
   pendChips_('veh-places', places.map(function(p){ return [p, p]; }), vehPlace, function(v){ vehPlace = v; document.getElementById('veh-other').value = ''; vehOpen2_(); });
+  vehFuelChips_();
   vehState_();
+}
+function vehFuelChips_() {
+  pendChips_('veh-fl', FUEL_LEVELS, vehFuel, function(v){ vehFuel = v; vehFuelChips_(); vehState_(); });
 }
 function vehOpen2_() {
   pendChips_('veh-places', ((DB.vehicles && DB.vehicles.places) || []).map(function(p){ return [p, p]; }), vehPlace,
@@ -2377,14 +2568,16 @@ function vehOpen2_() {
 function vehState_() {
   var km = Number(document.getElementById('veh-km').value), out = vehSel && vehSel.status === 'Out', trip = document.getElementById('veh-trip');
   trip.textContent = out && km ? (km >= vehSel.km ? 'Trip: ' + (km - vehSel.km) + ' km' : 'Lower than when it went out \u2014 check the km') : '';
-  document.getElementById('veh-save').disabled = !(km > 0 && vehPlace);
+  var fOk = !vehFuelAdd || (Number((document.getElementById('veh-fr') || {}).value) > 0 && photoBuf.fs);
+  document.getElementById('veh-save').disabled = !(km > 0 && vehPlace && vehFuel && fOk);
 }
 function vehSave_() {
   var out = vehSel.status === 'Out', km = Number(document.getElementById('veh-km').value), note = document.getElementById('veh-note').value.trim();
   if (out && km - vehSel.km > 600 && !confirm((km - vehSel.km) + ' km for one trip \u2014 is the km right?')) return;
   var btn = document.getElementById('veh-save');
   btn.disabled = true;
-  VEH_CALL({ op: out ? 'in' : 'out', name: vehSel.name, km: km, place: vehPlace, note: note }, function(r){
+  VEH_CALL({ op: out ? 'in' : 'out', name: vehSel.name, km: km, place: vehPlace, note: note, fuel: vehFuel,
+             fuelR: vehFuelAdd ? Number(document.getElementById('veh-fr').value) : '', slip: vehFuelAdd ? photoBuf.fs : '' }, function(r){
     if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); vehState_(); return; }
     DB.vehicles.list = r.vehicles;
     try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
@@ -2452,6 +2645,300 @@ function rFix_(row, mins) {
     toast('Time corrected to ' + r.minutes + ' min');
     loadReport(reportDays);
   }, function(){ toast('Save failed \u2014 check signal', true); });
+}
+
+/* ---- Brands, areas, fleets (B56/B57) ---- */
+var brand = '', hub = '';
+var AREA_SIDE = { guide: 'guide', rent: 'guide', ws: 'workshop', office: 'office' };
+function canIride_() {
+  if (roleRank_(role) >= 1) return true;
+  return (DB.people || []).some(function(p){ return p.name === user && p.iride; });
+}
+function brandFleet_() { return brand === 'iride' ? 'iRide' : 'BnW'; }
+function fleetOf_(b) { return (b && b.fleet) || 'BnW'; }
+function inBrand_(b) { return !brand || fleetOf_(b) === brandFleet_(); }
+function openBrand_(b) {
+  if (b === 'iride' && !canIride_()) { toast('iRide is for the warehouse team and office', true); return; }
+  if (b === 'iride') { unlockIride_(function(){ brand = 'iride'; hub = ''; go('home'); }); return; }
+  brand = b; hub = '';
+  go('home');
+}
+function openArea_(a) {
+  if (a === 'veh') { go('veh'); return; }
+  if (a === 'guide' && brand === 'iride') a = 'rent';
+  if (a === 'rent') { unlockIride_(function(){ go('hub-rent'); }); return; }
+  if (a === 'ws') { requireRole('workshop', 'hub-ws'); return; }
+  if (a === 'office') { requireRole('admin', 'hub-office'); return; }
+  go('hub-' + a);
+}
+function openHub_(h) { go('hub-' + h); }
+function hubBack_() { hub = ''; go('home'); }
+function paintProgress_(html) {
+  var warn = html.indexOf('<br>') !== -1 ? html.slice(html.indexOf('<br>') + 4) : '';
+  var a = document.getElementById('progress'); if (a) a.innerHTML = html;
+  ['progress2', 'progress3'].forEach(function(id){ var el = document.getElementById(id); if (el) el.innerHTML = warn; });
+}
+var AREA_TILES = {
+  guide: ['tile-tour', 'tile-gdash', 'tile-fc', 'tile-stock', 'tile-move'],
+  rent: ['sc-rent', 'sc-rentals', 'sc-ifleet'],
+  ws: ['tile-wq', 'tile-workshop', 'tile-wtasks', 'tile-hist', 'tile-inv', 'tile-order'],
+  office: ['tile-dash', 'tile-flist', 'of-rentals', 'tile-report', 'mg-fc', 'of-hist', 'of-inv', 'of-order', 'of-ipin', 'tile-assign']
+};
+var BNW_ONLY = { 'mg-fc': 1 }, IRIDE_ONLY = { 'of-rentals': 1 };
+function paintHome_() {
+  paintRoles_();
+  var show_ = function(id, on){ var el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  if (!brand) {
+    renderGreet_();
+    document.getElementById('wel-name').textContent = user ? ', ' + user : '';
+    show_('bc-iride', canIride_());
+    show('view-welcome');
+    return;
+  }
+  var bname = brand === 'iride' ? 'iRide' : 'Bikes \u2019n Wines';
+  if (hub) {
+    (AREA_TILES[hub] || []).forEach(function(id){
+      show_(id, !(brand === 'iride' && BNW_ONLY[id]) && !(brand !== 'iride' && IRIDE_ONLY[id]));
+    });
+    var hb = document.getElementById('hubbrand-' + hub);
+    if (hb) hb.textContent = bname;
+    if (hub === 'rent') {
+      var out = (DB.rentals || []).filter(function(r){ return r.status === 'Out'; }), tk = isoDay_(new Date());
+      var late = out.filter(function(r){ return r.due < tk; }).length;
+      document.getElementById('sc-rentals-n').innerHTML = out.length ? '\u00b7 ' + out.length + ' out' + (late ? ' <b style="color:var(--red)">\u00b7 ' + late + ' overdue</b>' : '') : '';
+    }
+    show('view-hub-' + hub);
+    return;
+  }
+  document.getElementById('home-title').textContent = bname;
+  document.getElementById('ar-guide-n').innerHTML = brand === 'iride' ? 'Rentals' : 'Guide';
+  document.getElementById('ar-guide-s').innerHTML = brand === 'iride' ? 'Rent a bike out (checklist + contract) &middot; rentals out &amp; returns &middot; iRide fleet'
+    : 'Tour bikes out &amp; in &middot; where are the bikes &middot; forecast &middot; snacks &amp; water';
+  document.getElementById('ar-office-s').innerHTML = brand === 'iride' ? 'iRide fleet dashboard &middot; faults &middot; rentals &middot; workshop report'
+    : 'Fleet dashboard &middot; faults &middot; workshop report &middot; forecast &middot; barcodes';
+  show('view-home');
+}
+function fleetOk_(b) {
+  if (!b || fleetOf_(b) !== 'iRide' || canIride_()) return true;
+  toast('That\u2019s an iRide bike \u2014 the warehouse team handles it', true);
+  go('home');
+  return false;
+}
+var dashFleet = 'BnW';
+function openFleet_(f) { dashFleet = f; requireRole(f === 'iRide' ? 'workshop' : 'admin', 'dash'); }
+var wqFleet = 'BnW';
+
+/* ---- iRide rentals (B56) ---- */
+var RENT_SECTIONS = [
+  ['Frame & fork', [['frame_visual', 'Visual inspection', 'Cracks, dents or paint damage'], ['frame_clean', 'Cleanliness', 'Frame clean, free of mud or debris']]],
+  ['Wheels & tyres', [['tyre_pressure', 'Tyre pressure', 'Inflated to the PSI on the sidewall'], ['tyre_condition', 'Tyre condition', 'No cuts, bulges or worn tread'],
+                      ['wheel_spin', 'Wheel spin', 'Both wheels spin freely and true'], ['axles', 'Quick release / thru-axle', 'Secure and properly tightened']]],
+  ['Brakes', [['brake_pads', 'Brake pads', 'Not worn beyond safe levels'], ['brake_function', 'Brake function', 'Front and rear stop smoothly'],
+              ['brake_levers', 'Brake levers', 'Responsive, return properly'], ['brake_lines', 'Cables / hydraulic lines', 'No fraying, leaks or damage']]],
+  ['Drivetrain', [['chain', 'Chain', 'No rust, lubed, right tension'], ['gears', 'Gears', 'Shifts through all gears without skipping'],
+                  ['cranks', 'Crankset & pedals', 'No play or wobble'], ['cassette', 'Cassette / freewheel', 'No wear or dirt build-up']]],
+  ['Steering & handlebars', [['bar_align', 'Handlebar alignment', 'Straight and secure'], ['headset', 'Headset', 'No play when rocking with front brake on'],
+                             ['grips', 'Grips / bar tape', 'Secure and in good condition']]],
+  ['Saddle & seatpost', [['seat_height', 'Seat height', 'Set to the client'], ['seat_secure', 'Seat security', 'Saddle tight, no wobble']]],
+  ['Accessories', [['bottle_cage', 'Water bottle cage', 'Secure'], ['toolkit', 'Toolkit / spare tube', 'Multitool, tyre levers, spare tube, patch kit'],
+                   ['pump', 'Hand pump', 'Packed']]],
+  ['Pedals', [['pedal_spindle', 'Pedal spindles', 'Greased, secure, smooth bearings']]],
+  ['Final checks', [['briefing', 'Client safety briefing', 'Brakes, gear shifting, safe riding'], ['cleaned', 'Cleaned', 'Presentable for the client'],
+                    ['agreement', 'Rental agreement', 'Paperwork completed']]]
+];
+var rentB = null, rentChecks = {}, rentHand = '', rentPedals = '';
+function rentKeys_() { var k = []; RENT_SECTIONS.forEach(function(s){ s[1].forEach(function(i){ k.push(i[0]); }); }); return k; }
+function openRent_() {
+  rentB = null; rentChecks = {}; rentHand = ''; rentPedals = '';
+  photoBuf.rc = ''; paintPhotoNote_('rc');
+  document.getElementById('rent-q').value = '';
+  document.getElementById('rent-pick').style.display = '';
+  document.getElementById('rent-form').style.display = 'none';
+  rentList_();
+  show('view-rent');
+}
+function rentList_() {
+  var q = normCode_(document.getElementById('rent-q').value.trim());
+  var bikes = (DB.bikes || []).filter(function(b){ return b.active !== 'No' && fleetOf_(b) === 'iRide' && b.status === 'Available' &&
+    (!q || normCode_(b.assetId).indexOf(q) !== -1 || String(b.barcode || '').indexOf(q) === 0); });
+  document.getElementById('rent-list').innerHTML = bikes.length ? bikes.map(function(b){
+    return '<div class="mres" style="display:flex;justify-content:space-between;padding:10px 4px;border-bottom:1px solid var(--line);cursor:pointer" onclick="rentPick_(\'' + jsq_(b.assetId) + '\')"><b>' +
+      escH_(b.assetId) + '</b><span style="font-size:12px;color:var(--grey)">' + escH_([b.category, b.frameSize, setupLabel_(b), b.location].filter(Boolean).join(' \u00b7 ')) + '</span></div>';
+  }).join('') : '<p class="note">No ready-to-ride iRide bikes match.</p>';
+}
+function rentPick_(aid) {
+  (DB.bikes || []).forEach(function(b){ if (b.assetId === aid) rentB = b; });
+  if (!rentB) return;
+  if (fleetOf_(rentB) !== 'iRide') { toast(aid + ' is a Bikes \u2019n Wines bike', true); rentB = null; return; }
+  if (rentB.status !== 'Available') { toast(aid + ' is ' + (STATUS_LABELS[rentB.status] || rentB.status) + ' \u2014 not ready to rent', true); rentB = null; return; }
+  document.getElementById('rent-pick').style.display = 'none';
+  document.getElementById('rent-form').style.display = '';
+  document.getElementById('rent-num').textContent = rentB.assetId;
+  document.getElementById('rent-meta').textContent = [rentB.category, rentB.brand, rentB.frameSize, setupLabel_(rentB)].filter(Boolean).join(' \u00b7 ');
+  ['rent-client', 'rent-contact', 'rent-special'].forEach(function(id){ document.getElementById(id).value = ''; });
+  document.getElementById('rent-start').value = isoDay_(new Date());
+  document.getElementById('rent-due').value = '';
+  document.getElementById('rent-signed').checked = false;
+  rentPaint_();
+  show('view-rent');
+}
+function rentPaint_() {
+  pendChips_('rent-hand', [['Collect at warehouse', 'Client collects at the warehouse'], ['Delivery', 'We deliver'], ['Delivery + collection', 'We deliver + collect']],
+    rentHand, function(v){ rentHand = v; rentPaint_(); });
+  pendChips_('rent-pedals', [['SPD', 'SPD'], ['Flat', 'Flat'], ['SPD-SL', 'SPD-SL'], ['Look Keo', 'Look Keo'], ['None', 'None']],
+    rentPedals, function(v){ rentPedals = v; rentPaint_(); });
+  document.getElementById('rent-checks').innerHTML = RENT_SECTIONS.map(function(sec, si){
+    return '<div class="rsec"><div class="rh"><span>' + (si + 1) + '. ' + sec[0] + '</span><a href="#" onclick="rentTickSec_(' + si + ');return false">tick all</a></div>' +
+      sec[1].map(function(it){
+        return '<label class="rck"><input type="checkbox" ' + (rentChecks[it[0]] ? 'checked ' : '') + 'onchange="rentChecks[\'' + it[0] + '\']=this.checked;rentState_()">' +
+          '<span>' + it[1] + '<small>' + it[2] + '</small></span></label>';
+      }).join('') + '</div>';
+  }).join('');
+  rentState_();
+}
+function rentTickSec_(si) { RENT_SECTIONS[si][1].forEach(function(it){ rentChecks[it[0]] = true; }); rentPaint_(); }
+function rentState_() {
+  var keys = rentKeys_(), done = keys.filter(function(k){ return rentChecks[k]; }).length;
+  document.getElementById('rent-count').textContent = done + ' of ' + keys.length;
+  var s = document.getElementById('rent-start').value, d = document.getElementById('rent-due').value;
+  var days = s && d && d >= s ? Math.round((new Date(d) - new Date(s)) / 864e5) + 1 : 0;
+  document.getElementById('rent-days').textContent = days ? days + ' day' + (days > 1 ? 's' : '') : (d && s && d < s ? 'Due back is before the start' : '');
+  var ok = rentB && document.getElementById('rent-client').value.trim() && days && rentHand && rentPedals &&
+           done === keys.length && document.getElementById('rent-signed').checked;
+  var btn = document.getElementById('rent-save');
+  btn.disabled = !ok;
+  btn.textContent = done < keys.length ? 'Release bike (' + (keys.length - done) + ' checks left)' : 'Release bike';
+}
+function rentSave_() {
+  var btn = document.getElementById('rent-save');
+  btn.disabled = true; btn.textContent = 'Saving\u2026';
+  RENT_CALL({ code: rentB.barcode || rentB.assetId, client: document.getElementById('rent-client').value.trim(),
+              contact: document.getElementById('rent-contact').value.trim(), start: document.getElementById('rent-start').value,
+              due: document.getElementById('rent-due').value, handover: rentHand, pedals: rentPedals,
+              special: document.getElementById('rent-special').value.trim(), checks: rentChecks, signed: true, photo: photoBuf.rc || '' }, function(r){
+    if (irideDenied_(r)) return;
+    if (r && r.denied) { toast('iRide PIN needed', true); rentState_(); return; }
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); rentState_(); return; }
+    rentB.status = 'On tour'; rentB.statusChanged = new Date().toISOString();
+    DB.rentals = r.rentals;
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    photoBuf.rc = '';
+    toast(r.assetId + ' rented out \u2014 ' + r.id);
+    go('home');
+  }, function(){ toast('Save failed \u2014 check signal', true); rentState_(); });
+}
+var rentOpen = null, rentCond = '';
+function renderRentals_() {
+  var t = isoDay_(new Date()), all = DB.rentals || [];
+  var out = all.filter(function(r){ return r.status === 'Out'; }).sort(function(a, b){ return a.due < b.due ? -1 : 1; });
+  document.getElementById('rentals-out').innerHTML = out.length ? out.map(function(r){
+    var cls = r.due < t ? ' late' : r.due === t ? ' today' : '', open = rentOpen === r.row;
+    return '<div class="rent' + cls + '"><div class="rt" onclick="rentOpen=(rentOpen===' + r.row + '?null:' + r.row + ');rentCond=\'\';renderRentals_()"><div><b>' +
+      escH_(r.assetId) + '</b> \u00b7 ' + escH_(r.client) + '<br><small style="color:var(--grey)">' + escH_([r.handover, r.pedals ? r.pedals + ' pedals' : '', 'out by ' + r.by].filter(Boolean).join(' \u00b7 ')) +
+      '</small></div><span>' + (r.due < t ? 'OVERDUE<br>' : r.due === t ? 'due today<br>' : 'due ') + niceDay_(r.due) + '</span></div>' +
+      (open ? '<div style="margin-top:8px"><div class="chips" id="rin-cond"></div>' +
+        '<input type="text" id="rin-notes" placeholder="' + (rentCond === 'Needs work' ? 'What needs work? (required)' : 'Notes (optional)') + '" autocomplete="off" style="margin-top:8px">' +
+        '<button class="primary" style="width:100%;margin-top:8px" onclick="rentIn_(' + r.row + ')">Check bike back in</button>' +
+        '<p class="note">It goes to Pending check for the post-rental check' + (rentCond === 'Needs work' ? ', with a fault for the workshop.' : '.') + '</p></div>' : '') + '</div>';
+  }).join('') : '<p class="note">No bikes out on rental.</p>';
+  if (rentOpen) pendChips_('rin-cond', [['Good', 'Came back good'], ['Needs work', 'Needs work']], rentCond, function(v){ rentCond = v; var n = document.getElementById('rin-notes').value; renderRentals_(); document.getElementById('rin-notes').value = n; });
+  var done = all.filter(function(r){ return r.status !== 'Out'; });
+  document.getElementById('rentals-done').innerHTML = done.length ? done.map(function(r){
+    return '<div class="rent"><div class="rt"><div><b>' + escH_(r.assetId) + '</b> \u00b7 ' + escH_(r.client) + '<br><small style="color:var(--grey)">' +
+      niceDay_(r.start) + ' \u2192 ' + (r.returned ? fmtWhen_(r.returned) : niceDay_(r.due)) + (r.condition ? ' \u00b7 ' + escH_(r.condition) : '') + (r.returnNotes ? ': ' + escH_(r.returnNotes) : '') +
+      '</small></div></div></div>';
+  }).join('') : '<p class="note">Nothing yet.</p>';
+}
+function rentIn_(row) {
+  var notes = document.getElementById('rin-notes').value.trim();
+  if (!rentCond) { toast('How did it come back?', true); return; }
+  if (rentCond === 'Needs work' && !notes) { toast('Say what needs work', true); return; }
+  RENTIN_CALL({ row: row, condition: rentCond, notes: notes }, function(r){
+    if (irideDenied_(r)) return;
+    if (r && r.denied) { toast('iRide PIN needed', true); return; }
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); return; }
+    DB.rentals = r.rentals;
+    (DB.bikes || []).forEach(function(b){ if (b.assetId === r.assetId) { b.status = 'Pending'; b.statusChanged = new Date().toISOString(); } });
+    if (rentCond === 'Needs work') { DB.faults = DB.faults || []; DB.faults.unshift({ assetId: r.assetId, fault: notes, by: user, when: new Date().toISOString(), photo: '' }); }
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast(r.assetId + ' checked in \u2014 now Pending check');
+    rentOpen = null; rentCond = '';
+    renderRentals_();
+  }, function(){ toast('Save failed \u2014 check signal', true); });
+}
+
+/* ---- Vehicle fuel (B56) ---- */
+var FUEL_LEVELS = [['Full', 'Full'], ['3/4', '\u00be'], ['1/2', '\u00bd'], ['1/4', '\u00bc'], ['Needs fuel urgently', 'Needs fuel urgently']];
+var vehFuel = '', vehFuelAdd = false, vehFuelOnly = false;
+function fuelBadge_(f) {
+  if (!f) return '';
+  var lab = (FUEL_LEVELS.filter(function(x){ return x[0] === f; })[0] || [f, f])[1];
+  return '<span class="fuelb' + (f === 'Needs fuel urgently' ? ' urgent' : '') + '">\u26fd ' + lab + '</span>';
+}
+function vehFuelOpen_(name) {
+  vehList_().forEach(function(v){ if (v.name === name) vehSel = v; });
+  if (!vehSel) return;
+  vehFuelOnly = true; vehFuel = 'Full';
+  photoBuf.fs = '';
+  document.getElementById('veh-title').textContent = 'I added fuel \u2014 ' + vehSel.name;
+  document.getElementById('veh-list').style.display = 'none';
+  var f = document.getElementById('veh-form');
+  f.style.display = '';
+  f.innerHTML = '<h2>How much did you spend? (R)</h2><input type="number" inputmode="decimal" id="veh-fr" placeholder="e.g. 850" oninput="vehFuelState_()">' +
+    '<h2>Photo of the slip</h2><input type="file" id="fs-photo" accept="image/*" class="hidden" onchange="photoPicked_(\'fs\', this);setTimeout(vehFuelState_, 800)">' +
+    '<button class="quiet" style="width:100%" onclick="document.getElementById(\'fs-photo\').click()">&#128247; Take a photo of the slip</button><p class="note" id="fs-photo-note"></p>' +
+    '<h2>Tank now</h2><div class="chips" id="veh-fl"></div>' +
+    '<div class="bar"><button class="quiet" onclick="vehBack_()">Cancel</button><button class="primary" id="veh-save" onclick="vehFuelSave_()" disabled>Save fuel</button></div>';
+  pendChips_('veh-fl', FUEL_LEVELS.slice(0, 4), vehFuel, function(v){ vehFuel = v; pendChips_('veh-fl', FUEL_LEVELS.slice(0, 4), vehFuel, arguments.callee); });
+  vehFuelState_();
+}
+function vehFuelState_() {
+  var b = document.getElementById('veh-save');
+  if (b) b.disabled = !(Number(document.getElementById('veh-fr').value) > 0 && photoBuf.fs);
+}
+function vehFuelSave_() {
+  var btn = document.getElementById('veh-save');
+  btn.disabled = true;
+  FUEL_CALL({ name: vehSel.name, fuelR: Number(document.getElementById('veh-fr').value), slip: photoBuf.fs, fuel: vehFuel }, function(r){
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); vehFuelState_(); return; }
+    DB.vehicles.list = r.vehicles;
+    try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+    toast('Fuel saved \u2014 ' + vehSel.name);
+    photoBuf.fs = ''; vehSel = null; vehFuelOnly = false;
+    renderVeh_();
+  }, function(){ toast('Save failed \u2014 check signal', true); vehFuelState_(); });
+}
+
+/* ---- iRide PIN (B58) ---- */
+var ipin = localStorage.getItem('cab_ipin') || '';
+function irideUnlocked_() { return roleRank_(role) >= 2 || !!ipin; }
+function unlockIride_(then) {
+  if (irideUnlocked_()) { then(); return; }
+  var p = window.prompt('iRide PIN:');
+  if (p === null) return;
+  IAUTH_CALL(p.trim(), function(r){
+    if (r && r.ok) { ipin = p.trim(); try { localStorage.setItem('cab_ipin', ipin); } catch(e) {} toast('iRide unlocked'); then(); }
+    else toast(r && r.unset ? 'No iRide PIN set yet \u2014 the office sets it under Office / Admin' : 'Wrong iRide PIN', true);
+  }, function(){ toast('Could not check PIN \u2014 signal?', true); });
+}
+function setIpin_() {
+  var a = window.prompt('New iRide PIN (4\u20138 digits):');
+  if (a === null) return;
+  var b = window.prompt('Type it again:');
+  if (b === null) return;
+  if (a.trim() !== b.trim()) { toast('The two PINs don\u2019t match', true); return; }
+  SETIPIN_CALL(a.trim(), function(r){
+    if (r && r.denied) { toast('Management PIN needed', true); return; }
+    if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); return; }
+    toast('iRide PIN set \u2014 share it with the iRide team');
+  }, function(){ toast('Save failed \u2014 check signal', true); });
+}
+function irideDenied_(r) {
+  if (!(r && r.denied && r.iride)) return false;
+  ipin = ''; try { localStorage.removeItem('cab_ipin'); } catch(e) {}
+  toast('iRide PIN has changed \u2014 enter the new one', true);
+  brand = ''; hub = ''; go('home');
+  return true;
 }
 
 function renderGreet_() {
@@ -2535,15 +3022,12 @@ function go(view) {
   if (view === 'home') {
     var tagged = DB.bikes.filter(function(b){ return b.barcode; }).length;
     var mine = (DB.onTour || []).filter(function(t){ return t.guide === user && !notDueYet_(t); });
-    document.getElementById('progress').innerHTML =
+    paintProgress_(
       tagged + ' of ' + DB.bikes.length + ' bikes tagged' +
       (mine.length ? '<br><b style="color:var(--red)">⚠ You still have ' + mine.length + ' bike' +
-        (mine.length > 1 ? 's' : '') + ' out on tour — scan them back in</b>' : '');
-    if (!side) { show('view-side'); return; }
-    paintSide_();
-    paintRoles_();
-    renderGreet_();
-    show('view-home');
+        (mine.length > 1 ? 's' : '') + ' out on tour — scan them back in</b>' : ''));
+    if (!side) { side = 'guide'; }
+    paintHome_();
   } else if (view === 'dash') {
     renderDash();
     show('view-dash');
@@ -2556,6 +3040,21 @@ function go(view) {
   } else if (view === 'gtask') {
     openGtask_();
     show('view-gtask');
+  } else if (view === 'welcome') {
+    brand = ''; hub = '';
+    go('home');
+  } else if (view.indexOf('hub-') === 0) {
+    hub = view.slice(4);
+    if (!brand) brand = 'bnw';
+    if (AREA_SIDE[hub]) { side = AREA_SIDE[hub]; try { localStorage.setItem('cab_side', side); } catch(e) {} }
+    go('home');
+  } else if (view === 'rent') {
+    openRent_();
+  } else if (view === 'rentals') {
+    rentOpen = null;
+    renderRentals_();
+    show('view-rentals');
+    REFRESH_DATA(function(){ var v = document.getElementById('view-rentals'); if (v && !v.classList.contains('hidden') && !rentOpen) renderRentals_(); });
   } else if (view === 'veh') {
     vehSel = null;
     renderVeh_();
@@ -2603,6 +3102,7 @@ function go(view) {
     show('view-mv');
     return;
   } else if (view === 'wq') {
+    if (brand) wqFleet = brandFleet_();
     renderWq_();
     paintWqFc_();
     show('view-wq');
@@ -2640,7 +3140,7 @@ function go(view) {
   } else if (view === 'tour-in') {
     renderTourIn_();
     show('view-tourin');
-  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in-scan' || view === 'move-scan' || view === 'hist-scan' || view === 'rp-scan') {
+  } else if (view === 'assign' || view === 'lookup' || view === 'workshop' || view === 'tour-out' || view === 'tour-in-scan' || view === 'move-scan' || view === 'hist-scan' || view === 'rp-scan' || view === 'rent-scan') {
     mode = (view === 'tour-in-scan') ? 'tour-in' : view;
     document.getElementById('scan-title').textContent =
       view === 'assign' ? 'Scan the sticker on the bike'
@@ -2649,7 +3149,8 @@ function go(view) {
       : view === 'tour-in-scan' ? 'Scan each bike coming back to ' + tourLoc
       : view === 'move-scan' ? 'Scan each bike going to ' + mvLoc
       : view === 'hist-scan' ? 'Scan a bike to see its history'
-      : view === 'rp-scan' ? 'Scan the bike with the problem' : 'Scan a bike';
+      : view === 'rp-scan' ? 'Scan the bike with the problem'
+      : view === 'rent-scan' ? 'Scan the iRide bike going out' : 'Scan a bike';
     document.getElementById('manual').value = '';
     var mr = document.getElementById('m-results'); if (mr) mr.innerHTML = '';
     var sb = document.getElementById('snapbtn');
@@ -2754,7 +3255,8 @@ function pickManual_(code) {
 /* ---- Workshop side (B26): work queue + written task list ---- */
 function renderWq_() {
   var el = document.getElementById('wq-list');
-  var bikes = (DB.bikes || []).filter(function(b){ return b.active !== 'No'; });
+  pendChips_('wq-fleet', [['BnW', 'Bikes \u2019n Wines'], ['iRide', 'iRide'], ['All', 'Both']], wqFleet, function(v){ wqFleet = v; renderWq_(); paintWqFc_(); });
+  var bikes = (DB.bikes || []).filter(function(b){ return b.active !== 'No' && (wqFleet === 'All' || fleetOf_(b) === wqFleet); });
   var openParts = {};
   (DB.partsNeeded || []).forEach(function(p){
     if (p.assetId && p.assetId !== 'Stock') (openParts[p.assetId] = openParts[p.assetId] || []).push(p);
@@ -3104,6 +3606,7 @@ function onCode(code) {
         } else { goTour_(); }
         return;
       }
+      if (r.blocked && r.iride) { toast(r.assetId + ' is an iRide bike \u2014 not for Bikes \u2019n Wines tours', true); goTour_(); return; }
       if (r.blocked) { toast(r.assetId + ' is ' + (STATUS_LABELS[r.status] || r.status) + ' \u2014 not tour-ready', true); goTour_(); return; }
       if (r.already) { toast(r.assetId + ' is already out', true); goTour_(); return; }
       var wasOut = null;
@@ -3128,6 +3631,11 @@ function onCode(code) {
         toast(r.assetId + (dir === 'out' ? ' \u2014 out at ' + tourLoc + ' (' + tourSession.length + ')' : ' \u2014 back in at ' + tourLoc));
       goTour_();            // straight back to the scanner \u2014 next bike
     }, function(){ toast('Save failed \u2014 check signal', true); goTour_(); });
+  } else if (mode === 'rent-scan') {
+    var ib = findBikeLocal_(code);
+    if (!ib) { toast('No bike carries ' + code + ' \u2014 try the name', true); go('rent-scan'); return; }
+    rentPick_(ib.assetId);
+    if (!rentB) openRent_();
   } else if (mode === 'rp-scan') {
     var rb = findBikeLocal_(code);
     if (!rb) { toast('No bike carries ' + code + ' \u2014 try the name', true); go('rp-scan'); return; }
@@ -3159,7 +3667,7 @@ function onCode(code) {
     apiPost({ action: 'lookup', barcode: code }, function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet', true); go('lookup'); return; }
       bikeFrom = 'lookup';
-      syncNotes_(r); openBike(r.bike, r.faults);
+      if (!fleetOk_(r.bike)) return; syncNotes_(r); openBike(r.bike, r.faults);
     }, function(e){ toast('Save failed — check signal', true); go('lookup'); });
   }
 }
@@ -3279,7 +3787,7 @@ function openBikeByBarcode(bc, from) {
   current.code = bc;
   LOOKUP_CALL(bc, function(r){
     if (r.notFound) { toast('Bike not found', true); return; }
-    syncNotes_(r); openBike(r.bike, r.faults);
+    if (!fleetOk_(r.bike)) return; syncNotes_(r); openBike(r.bike, r.faults);
   }, function(){ toast('Lookup failed — check signal', true); });
 }
 function openBike(b, faults) {
@@ -3402,7 +3910,8 @@ function renderBrands_(bikes) {
 }
 
 function renderDash() {
-  var bikes = activeBikes_();
+  pendChips_('d-fleet', [['BnW', 'Bikes \u2019n Wines'], ['iRide', 'iRide']], dashFleet, function(v){ dashFleet = v; dashFilter = 'All'; renderDash(); });
+  var bikes = activeBikes_().filter(function(b){ return fleetOf_(b) === dashFleet; });
 
   /* headline: guide bikes are CAB's but not part of the tour fleet */
   var gBikes = bikes.filter(function(b){ return b.status === 'Guide bike'; });
@@ -3420,7 +3929,7 @@ function renderDash() {
   }).length;
   document.getElementById('d-pct').textContent = pct + '%';
   document.getElementById('d-ready-sub').innerHTML =
-    ready + ' of ' + total + ' tour bikes' + (atHub ? '<br>' + atHub + ' ready but sitting at a hub' : '');
+    ready + ' of ' + total + (dashFleet === 'iRide' ? ' iRide bikes' : ' BnW tour bikes') + (atHub && dashFleet !== 'iRide' ? '<br>' + atHub + ' ready but sitting at a hub' : '');
   var bar = '', leg = '';
   DB.statuses.forEach(function(st){
     if (st === 'Guide bike') return;
@@ -3428,7 +3937,7 @@ function renderDash() {
     if (n) bar += '<div style="width:' + (n / total * 100) + '%;background:' + STATUS_COLORS[st] + '"></div>';
     leg += '<span' + (n ? ' class="legtap" data-st="' + st + '" onclick="showStat_(\'' + st + '\')"' : '') + '>' +
            '<span class="dot" style="background:' + STATUS_COLORS[st] + '"></span>' +
-           (STATUS_LABELS[st] || st) + ' <b>' + n + '</b></span>';
+           (dashFleet === 'iRide' && st === 'On tour' ? 'On rental' : (STATUS_LABELS[st] || st)) + ' <b>' + n + '</b></span>';
   });
   document.getElementById('d-bar').innerHTML = bar;
   if (gBikes.length) {
@@ -3732,6 +4241,7 @@ function openJob(b, hist) {
   });
   outcomeChips_();
   jobStock = [];
+  document.getElementById('j-more').open = false;
   paintJobStock_();
   paintClock_();
   jobSaveState();
@@ -3835,9 +4345,14 @@ function PARTDONE_CALL(row, ok, err) { apiPost({ action: 'partdone', row: row, u
 function PARTSDONE_CALL(rows, ok, err) { apiPost({ action: 'partsdone', rows: rows, user: user, pin: pin }, ok, err); }
 function REFRESH_DATA(done) { apiGet(function(d){ DB = d; if (staffCheck_()) return; if (done) done(); }, function(){}); }
 function JOB_CALL(p, ok, err) { p.action = 'job'; p.pin = pin; apiPost(p, ok, err); }
+function RENT_CALL(o, ok, err) { apiPost({ action: 'rent', rental: o, user: user, pin: pin, ipin: ipin }, ok, err); }
+function IAUTH_CALL(p, ok, err) { apiPost({ action: 'iauth', ipin: p, pin: pin }, ok, err); }
+function SETIPIN_CALL(p, ok, err) { apiPost({ action: 'setipin', newPin: p, pin: pin, user: user }, ok, err); }
+function RENTIN_CALL(p, ok, err) { apiPost({ action: 'rentin', row: p.row, condition: p.condition, notes: p.notes, user: user, pin: pin, ipin: ipin }, ok, err); }
+function FUEL_CALL(p, ok, err) { apiPost({ action: 'fuel', name: p.name, fuelR: p.fuelR, slip: p.slip, fuel: p.fuel, user: user }, ok, err); }
 function TIMER_CALL(p, ok, err) { apiPost({ action: 'timer', op: p.op, code: p.code, row: p.row, user: user, pin: pin }, ok, err); }
 function TIMEFIX_CALL(p, ok, err) { apiPost({ action: 'timefix', row: p.row, minutes: p.minutes, note: p.note, user: user, pin: pin }, ok, err); }
-function VEH_CALL(p, ok, err) { apiPost({ action: 'vehicle', op: p.op, name: p.name, km: p.km, place: p.place, note: p.note, user: user }, ok, err); }
+function VEH_CALL(p, ok, err) { apiPost({ action: 'vehicle', op: p.op, name: p.name, km: p.km, place: p.place, note: p.note, user: user, fuel: p.fuel, fuelR: p.fuelR, slip: p.slip }, ok, err); }
 function STOCKMV_CALL(p, ok, err) { apiPost({ action: 'stockmove', item: p.item, qty: p.qty, reason: p.reason, bike: p.bike, note: p.note, user: user, pin: pin }, ok, err); }
 function PROBLEM_CALL(p, ok, err) { p.action = 'problem'; p.user = user; apiPost(p, ok, err); }
 function FORECAST_CALL(force, ok, err) { apiPost({ action: 'forecast', force: !!force, user: user }, ok, err); }
