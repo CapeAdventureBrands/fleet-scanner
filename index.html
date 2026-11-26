@@ -1104,7 +1104,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbyJnVzWaC0YtUeUrGt_fWIphKVfz0SM6NDvylwTcFODJ8dZHpUkTBgQAkutkIJrujkJ/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbzb1V-H7nfU6q1Bc6gzzupNQARM8yNwT5IBfQAJQPxKyreaziSxzLZ6gP0aND3D6pso/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -1117,7 +1117,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B60';
+var UI_VERSION = 'B61';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -3383,6 +3383,72 @@ function snapDecode(input) {
 function stopScanner() {
   if (scanner) { try { scanner.stop().then(function(){ scanner.clear(); }); } catch(e){} scanner = null; }
 }
+/* ---- B61: open a bike instantly from the phone's own list, then refresh from the server quietly ---- */
+function localBike_(code) {
+  code = String(code || '').trim();
+  var n = normCode_(code), hit = null;
+  if (!code) return null;
+  (DB.bikes || []).some(function(b){
+    if (String(b.barcode || '') === code || (n && normCode_(b.assetId) === n)) { hit = b; return true; }
+    return false;
+  });
+  return hit;
+}
+function cachedFaults_(aid) { return (DB.faults || []).filter(function(f){ return f.assetId === aid; }); }
+function localPut_(b) {
+  if (!b || !b.assetId) return;
+  var done = false;
+  DB.bikes = (DB.bikes || []).map(function(x){ if (x.assetId === b.assetId) { done = true; return b; } return x; });
+  if (!done) DB.bikes.push(b);
+  try { localStorage.setItem('cab_db', JSON.stringify(DB)); } catch(e) {}
+}
+function histHtml_(hist) {
+  var hh = '';
+  (hist || []).forEach(function(h){
+    hh += '<div class="hist"><span class="d">' + fmtDate_(h.when) + '</span><span><b>' +
+          h.work + '</b>' + (h.service ? ' \u00b7 service' : '') +
+          '<div class="m">' + [h.by, h.parts].filter(Boolean).join(' \u00b7 ') + '</div></span></div>';
+  });
+  return hh ? '<div class="hist-title">Service history</div>' + hh : '';
+}
+function jobRefresh_(code) {
+  var aid = current.bike && current.bike.assetId;
+  document.getElementById('j-hist').innerHTML = '<p class="note">Loading service history\u2026</p>';
+  LOOKUP_CALL(code, function(r){
+    if (!r || !r.ok || !r.bike || !current.bike || current.bike.assetId !== aid || r.bike.assetId !== aid) return;
+    syncNotes_(r); localPut_(r.bike);
+    var untouched = !job.work.length && !job.mins && !job.outcome && !(job.parts || []).length && !document.getElementById('j-notes').value;
+    if (untouched && (r.bike.status !== current.bike.status || r.bike.location !== current.bike.location)) { openJob(r.bike, r.history, r.faults); return; }
+    document.getElementById('j-hist').innerHTML = histHtml_(r.history);
+    renderFaults_('j-faults', r.faults, true);
+  }, function(){ document.getElementById('j-hist').innerHTML = ''; });
+}
+function bikeRefresh_(code) {
+  var aid = current.bike && current.bike.assetId;
+  LOOKUP_CALL(code, function(r){
+    if (!r || !r.ok || !r.bike || !current.bike || current.bike.assetId !== aid || r.bike.assetId !== aid) return;
+    syncNotes_(r); localPut_(r.bike);
+    var vis = !document.getElementById('view-bike').classList.contains('hidden');
+    if (vis && !current.newLoc && !current.newStatus) openBike(r.bike, r.faults);
+  }, function(){});
+}
+function fastJob_(code) {
+  var lb = localBike_(code);
+  if (!lb) return false;
+  openJob(lb, [], cachedFaults_(lb.assetId));
+  jobRefresh_(code);
+  return true;
+}
+function fastBike_(code, from) {
+  var lb = localBike_(code);
+  if (!lb) return false;
+  bikeFrom = from;
+  if (!fleetOk_(lb)) return true;
+  openBike(lb, cachedFaults_(lb.assetId));
+  bikeRefresh_(code);
+  return true;
+}
+
 /* ---- Find a bike by name (B23) ---- */
 function normCode_(s) {
   return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '').replace(/(^|[a-z])0+(\d)/g, '$1$2');
@@ -3555,6 +3621,7 @@ function saveWqFixed_() {
 
 function wqOpen_(code) {
   current.code = code;
+  if (fastJob_(code)) return;
   LOOKUP_CALL(code, function(r){
     if (r.notFound) { toast('Bike not found', true); return; }
     syncNotes_(r); openJob(r.bike, r.history, r.faults);
@@ -3817,6 +3884,7 @@ function onCode(code) {
       go('move-scan');
     }, function(){ toast('Save failed \u2014 check signal', true); go('move-scan'); });
   } else if (mode === 'workshop') {
+    if (fastJob_(code)) return;
     var onFound = function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet — assign it first', true); go('workshop'); return; }
       syncNotes_(r); openJob(r.bike, r.history, r.faults);
@@ -3824,6 +3892,7 @@ function onCode(code) {
     var onErr = function(){ toast('Lookup failed — check signal', true); go('workshop'); };
     LOOKUP_CALL(code, onFound, onErr);
   } else {
+    if (fastBike_(code, 'lookup')) return;
     apiPost({ action: 'lookup', barcode: code }, function(r){
       if (r.notFound) { toast('No bike carries ' + code + ' yet', true); go('lookup'); return; }
       bikeFrom = 'lookup';
@@ -3945,6 +4014,7 @@ function openBikeByBarcode(bc, from) {
   if (!bc) { toast('Not tagged yet — no barcode to open', true); return; }
   bikeFrom = from || 'dash';
   current.code = bc;
+  if (fastBike_(bc, bikeFrom)) return;
   LOOKUP_CALL(bc, function(r){
     if (r.notFound) { toast('Bike not found', true); return; }
     if (!fleetOk_(r.bike)) return; syncNotes_(r); openBike(r.bike, r.faults);
@@ -4417,13 +4487,7 @@ function openJob(b, hist) {
   document.getElementById('j-lastserv').textContent = fmtDate_(b.lastService);
 
   renderFaults_('j-faults', arguments.length > 2 ? arguments[2] : [], true);
-  var hh = '';
-  (hist || []).forEach(function(h){
-    hh += '<div class="hist"><span class="d">' + fmtDate_(h.when) + '</span><span><b>' +
-          h.work + '</b>' + (h.service ? ' \u00b7 service' : '') +
-          '<div class="m">' + [h.by, h.parts].filter(Boolean).join(' \u00b7 ') + '</div></span></div>';
-  });
-  document.getElementById('j-hist').innerHTML = hh ? '<div class="hist-title">Service history</div>' + hh : '';
+  document.getElementById('j-hist').innerHTML = histHtml_(hist);
 
   document.getElementById('j-notes').value = '';
   document.getElementById('j-parts').value = '';
