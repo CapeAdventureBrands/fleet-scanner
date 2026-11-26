@@ -335,6 +335,21 @@
   .hidden { display:none; }
   .back { background:none; border:none; font:600 14px 'Inter',sans-serif; color:var(--grey); cursor:pointer; padding:8px 0; }
   .note { font-size:13px; color:var(--grey); margin-top:8px; }
+  .rflag { background:#D2141B; color:#fff; padding:16px; border-radius:10px; margin:8px 0 12px; }
+  .rflag .rft { font-size:26px; font-weight:800; letter-spacing:.5px; }
+  .rflag .rfb { font-size:22px; font-weight:800; margin-top:2px; }
+  .rflag p { margin:6px 0 0; color:#fff; font-size:14px; }
+  .sth { font-size:15px; margin:16px 0 2px; text-transform:uppercase; letter-spacing:.6px; color:var(--grey); }
+  .crhead { padding:12px 14px; border-radius:10px; font-weight:700; font-size:17px; margin:6px 0 12px; }
+  .crhead.ok { background:#E9F5EC; color:#1B7A3D; } .crhead.bad { background:#FDECEC; color:#D2141B; }
+  .crt { width:100%; border-collapse:collapse; font-size:15px; }
+  .crt td, .crt th { padding:8px 4px; border-bottom:1px solid var(--line); text-align:right; }
+  .crt td:first-child, .crt th:first-child { text-align:left; }
+  .crt th { font-size:12px; color:var(--grey); font-weight:600; }
+  .crt .neg { color:#D2141B; font-weight:700; } .crt .pos { color:#B87A0E; font-weight:700; } .crt .zero { color:#1B7A3D; }
+  .crx { margin-top:12px; padding:10px 12px; border-left:4px solid #D2141B; background:#FFF6F6; font-size:14px; }
+  .crx.pos { border-color:#B87A0E; background:#FFF9EC; }
+  .crx ul { margin:6px 0 0 18px; padding:0; }
 </style>
 </head>
 <body>
@@ -414,13 +429,17 @@
         <div class="big">Where are the bikes?</div>
         <div class="sub">Ready bikes by size at each site, pending checks, what&rsquo;s out</div>
       </button>
+      <button class="tile" onclick="fl.fleet=brandFleet_();go('flist')" id="tile-gflist">
+        <div class="big">Faults &amp; heads-ups</div>
+        <div class="sub">Open faults and things to be aware of on the bikes &mdash; check before you ride</div>
+      </button>
       <button class="tile" onclick="go('fc')" id="tile-fc">
         <div class="big">Bike forecast</div>
         <div class="sub">Bikes needed per day from the manifest &mdash; up or down per site</div>
       </button>
       <button class="tile" onclick="go('stock')" id="tile-stock">
-        <div class="big">Snacks &amp; water count</div>
-        <div class="sub">End of the day &mdash; count what&rsquo;s left, tick what needs ordering</div>
+        <div class="big">End-of-day count</div>
+        <div class="sub">Bikes by size, helmets, snacks &amp; water &mdash; the bikes are checked against the scans</div>
       </button>
       <button class="tile" onclick="go('mv')" id="tile-move">
         <div class="big">Move bikes</div>
@@ -463,6 +482,10 @@
       <button class="tile" onclick="requireRole('workshop','wq')" id="tile-wq">
         <div class="big">To do &mdash; bikes needing attention <span class="lock">&#128274;</span></div>
         <div class="sub">The work queue &mdash; what to pick up next</div>
+      </button>
+      <button class="tile" onclick="fl.fleet=brandFleet_();go('flist')" id="tile-wflist">
+        <div class="big">Faults &amp; heads-ups</div>
+        <div class="sub">Every open fault and heads-up &mdash; who logged it, when, photos</div>
       </button>
       <button class="tile" onclick="requireRole('workshop','workshop')" id="tile-workshop">
         <div class="big">Log workshop work <span class="lock">&#128274;</span></div>
@@ -526,10 +549,6 @@
       <button class="tile" onclick="requireRole('workshop','order')" id="of-order">
         <div class="big">Order parts <span class="lock">&#128274;</span></div>
         <div class="sub">Parts the workshop needs &mdash; emailed daily until received</div>
-      </button>
-      <button class="tile" onclick="setIpin_()" id="of-ipin">
-        <div class="big">Set iRide PIN</div>
-        <div class="sub">The PIN the iRide team uses to open iRide &mdash; change it when someone leaves</div>
       </button>
       <button class="tile" onclick="requireRole('admin','assign')" id="tile-assign">
         <div class="big">Assign barcodes <span class="lock">&#128274;</span></div>
@@ -890,11 +909,16 @@
   <!-- SNACKS & WATER COUNT (B48) -->
   <section id="view-stock" class="hidden">
     <button class="back" onclick="go('home')">&#8249; Back</button>
-    <h2>Snacks &amp; water count</h2>
-    <p class="note">Count what&rsquo;s left at your site. Tick <b>Need more</b> for anything running low &mdash; the order is emailed straight away.</p>
+    <h2 id="st-title">End-of-day count</h2>
+    <p class="note" id="st-intro">Count what&rsquo;s physically at your site right now. Bikes by number &mdash; <b>don&rsquo;t count guide bikes</b>. Bikes still out on tour are taken care of. Tick <b>Need more</b> for anything running low &mdash; the order is emailed straight away.</p>
     <div class="chips" id="st-sites"></div>
     <p class="note" id="st-last" style="margin-top:8px"></p>
+    <h3 class="sth">Bikes</h3>
+    <div id="st-bikes"></div>
+    <div id="st-iwrap">
+    <h3 class="sth">Helmets, snacks &amp; water</h3>
     <div id="st-items"></div>
+    </div>
     <input type="text" id="st-note" placeholder="Note (optional) &mdash; e.g. water for Saturday&rsquo;s big group" autocomplete="off" style="margin-top:12px">
     <div class="bar">
       <button class="quiet" onclick="go('home')">Cancel</button>
@@ -902,6 +926,34 @@
     </div>
   </section>
 
+
+  <!-- RED FLAG: open fault on a bike going out on tour (B59) -->
+  <section id="view-redflag" class="hidden">
+    <div class="rflag">
+      <div class="rft">&#9888; Open fault</div>
+      <div class="rfb" id="rf-bike"></div>
+      <p>This bike has a fault the workshop hasn&rsquo;t fixed yet. Best to pick another bike.</p>
+    </div>
+    <div id="rf-list"></div>
+    <h2>Taking it anyway?</h2>
+    <input type="text" id="rf-why" placeholder="Why? e.g. only size L left &mdash; checked the brakes myself" autocomplete="off" oninput="rfState_()">
+    <p class="note">It gets logged &mdash; the workshop and office see it in tonight&rsquo;s email.</p>
+    <div class="bar">
+      <button class="quiet" onclick="rfCancel_()">Pick another bike</button>
+      <button class="primary" id="rf-go" onclick="rfGo_()" disabled>Take it anyway</button>
+    </div>
+  </section>
+
+  <!-- END-OF-DAY BIKE COUNT RESULT (B59) -->
+  <section id="view-cntres" class="hidden">
+    <button class="back" onclick="go('home')">&#8249; Back</button>
+    <h2 id="cr-title">Bike count</h2>
+    <div id="cr-box"></div>
+    <div class="bar">
+      <button class="quiet" id="cr-re" onclick="stRecount_()">Recount bikes</button>
+      <button class="primary" onclick="go('home')">Done</button>
+    </div>
+  </section>
 
   <!-- FAULTS & HEADS-UPS QUICK VIEW (B49) -->
   <section id="view-flist" class="hidden">
@@ -1040,7 +1092,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbwd8RhCP6JInwa2wC0pX_BhX9u5CMYEs5vM207wdBanDPA5dJxR5lxhO7FEjAmUhXh3/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbyJzIGAlR_6cNm9Jaa2mZgBnzQy-O4FaudBMOF4S5hk6e0Nq3CvDIEpzuurJZsaeiB-/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -1053,7 +1105,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B58';
+var UI_VERSION = 'B59';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -1169,7 +1221,7 @@ function toast(msg, err) {
   setTimeout(function(){ t.className = 'toast' + (err ? ' err' : ''); }, 2200);
 }
 function show(id) {
-  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp','view-stock','view-flist','view-fc','view-fcd','view-veh','view-inv','view-welcome','view-hub-guide','view-hub-rent','view-hub-ws','view-hub-office','view-rent','view-rentals'].forEach(function(v){
+  ['view-who','view-home','view-scan','view-pick','view-bike','view-dash','view-job','view-report','view-tour','view-side','view-gtask','view-order','view-check','view-tourin','view-wq','view-wtasks','view-mv','view-gd','view-hist','view-hpick','view-rp','view-stock','view-flist','view-fc','view-fcd','view-veh','view-inv','view-welcome','view-hub-guide','view-hub-rent','view-hub-ws','view-hub-office','view-rent','view-rentals','view-redflag','view-cntres'].forEach(function(v){
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -1230,7 +1282,7 @@ function hennieLine_(tag, salt) {
   return pool[Math.abs(h) % pool.length][1];
 }
 function mySite_() {
-  if (side === 'workshop') return 'Workshop';
+  if (side === 'workshop') return 'Cape Town';
   var s = '';
   try { s = localStorage.getItem('cab_site') || ''; } catch(e) {}
   return SITE_LL[s] ? s : 'Cape Town';
@@ -2140,18 +2192,22 @@ function stUnit_(n, unit) {
   if (/(x|s|ch|sh)es$/.test(unit)) return unit.slice(0, -2);
   return /s$/.test(unit) ? unit.slice(0, -1) : unit;
 }
-function stSites_() { return (DB.locations || []).filter(function(l){ return l !== 'Workshop'; }); }
+function stSites_() { return (DB.locations || []).filter(function(l){ return l !== 'Workshop' && l !== 'In Transit'; }); }
 function renderStock_() {
   var saved = '';
   try { saved = localStorage.getItem('cab_site') || ''; } catch(e) {}
   var sites = stSites_();
-  st = { site: sites.indexOf(saved) !== -1 ? saved : (sites.length === 1 ? sites[0] : ''), counts: {}, more: {} };
+  st = { site: sites.indexOf(saved) !== -1 ? saved : (sites.length === 1 ? sites[0] : ''), counts: {}, more: {}, bikes: {}, groups: stGroups_(), recount: false };
   document.getElementById('st-note').value = '';
   stPaint_();
 }
 function stPaint_() {
   pendChips_('st-sites', stSites_().map(function(l){ return [l, l]; }), st.site, function(v){ st.site = v; stPaint_(); });
   var last = (DB.stockLast || {})[st.site], items = DB.stockItems || [];
+  document.getElementById('st-title').textContent = st.recount ? 'Recount bikes' : 'End-of-day count';
+  document.getElementById('st-iwrap').style.display = st.recount ? 'none' : '';
+  document.getElementById('st-note').style.display = st.recount ? 'none' : '';
+  document.getElementById('st-bikes').innerHTML = stBikesHtml_();
   document.getElementById('st-last').innerHTML = !st.site ? 'Pick your site first.'
     : last ? 'Last count here: ' + fmtWhen_(last.when) + (last.by ? ' by ' + escH_(last.by) : '') : 'No count yet at ' + escH_(st.site) + '.';
   document.getElementById('st-items').innerHTML = !items.length
@@ -2169,8 +2225,9 @@ function stPaint_() {
   stReady_();
 }
 function stReady_() {
-  var any = (DB.stockItems || []).some(function(it){ var v = st.counts[it.item]; return v !== undefined && v !== ''; });
-  document.getElementById('st-send').disabled = !(st.site && any);
+  var any = !st.recount && (DB.stockItems || []).some(function(it){ var v = st.counts[it.item]; return v !== undefined && v !== ''; });
+  var anyB = (st.groups || []).some(function(g){ var v = st.bikes[g]; return v !== undefined && v !== ''; });
+  document.getElementById('st-send').disabled = !(st.site && (any || anyB));
 }
 function stStep_(i, d) {
   var it = DB.stockItems[i], v = Number(st.counts[it.item]) || 0;
@@ -2184,22 +2241,108 @@ function stType_(i, val) {
 }
 function stMore_(i, on) { st.more[DB.stockItems[i].item] = !!on; }
 function stSend_() {
-  var counts = (DB.stockItems || []).filter(function(it){ var v = st.counts[it.item]; return v !== undefined && v !== ''; })
+  var counts = st.recount ? [] : (DB.stockItems || []).filter(function(it){ var v = st.counts[it.item]; return v !== undefined && v !== ''; })
     .map(function(it){ return { item: it.item, count: Number(st.counts[it.item]), more: !!st.more[it.item] }; });
-  var missing = (DB.stockItems || []).length - counts.length;
-  if (missing > 0 && !confirm(missing + ' item' + (missing > 1 ? 's' : '') + ' not counted \u2014 send anyway?')) return;
+  var bikes = st.groups.filter(function(g){ var v = st.bikes[g]; return v !== undefined && v !== ''; })
+    .map(function(g){ return { group: g, count: Number(st.bikes[g]) }; });
+  var missing = (st.recount ? 0 : (DB.stockItems || []).length - counts.length) + st.groups.length - bikes.length;
+  if (missing > 0 && !confirm(missing + ' line' + (missing > 1 ? 's' : '') + ' not counted (leave blank = not counted, 0 = none here) \u2014 send anyway?')) return;
   var btn = document.getElementById('st-send');
   btn.disabled = true; btn.textContent = 'Sending\u2026';
-  STOCK_CALL({ site: st.site, counts: counts, note: document.getElementById('st-note').value.trim() }, function(r){
+  STOCK_CALL({ site: st.site, counts: counts, bikes: bikes, recount: st.recount, note: st.recount ? '' : document.getElementById('st-note').value.trim() }, function(r){
     btn.textContent = 'Send count';
     if (!r || !r.ok) { toast((r && r.error) || 'Server is running old code \u2014 redeploy Code.gs (New version)', true); stReady_(); return; }
     DB.stockLast = DB.stockLast || {};
     if (r.last) DB.stockLast[st.site] = r.last;
     try { localStorage.setItem('cab_db', JSON.stringify(DB)); localStorage.setItem('cab_site', st.site); } catch(e) {}
-    toast(r.emailed ? (r.more.length ? 'Count sent \u2014 order emailed: ' + r.more.join(', ') : 'Count sent \u2014 thanks!')
+    if (r.stock !== false && counts.length) toast(r.emailed ? (r.more.length ? 'Count sent \u2014 order emailed: ' + r.more.join(', ') : 'Count sent \u2014 thanks!')
                     : 'Count saved \u2014 nobody on the Stock_Emails tab yet, so no email went out', !r.emailed);
+    else toast('Bike count saved');
+    if (r.bikes) { stResult_(r.bikes); return; }
+    if (bikes.length) toast('Server is running old code \u2014 redeploy Code.gs (New version)', true);
     go('home');
   }, function(){ btn.textContent = 'Send count'; stReady_(); toast('Save failed \u2014 check signal', true); });
+}
+
+/* ---- End-of-day bike count (B59) ---- */
+function bikeGroup_(cat, wheel) {
+  var e = /\be[\s-]?bike/i.test(String(cat || '')) ? 'E-bike' : 'Standard';
+  var m = String(wheel == null ? '' : wheel).match(/\d+(\.\d+)?/);
+  return e + ' ' + (m ? m[0] + '"' : '(no wheel size)');
+}
+function groupSort_(a, b) {
+  var ea = a.indexOf('E-bike') === 0, eb = b.indexOf('E-bike') === 0;
+  if (ea !== eb) return ea ? 1 : -1;
+  return (parseFloat(b.replace(/^\D+/, '')) || 0) - (parseFloat(a.replace(/^\D+/, '')) || 0);
+}
+function stGroups_() {
+  var g = {};
+  (DB.bikes || []).forEach(function(b){
+    if (b.active === 'No' || b.status === 'Retired' || b.status === 'Guide bike' || fleetOf_(b) === 'iRide') return;
+    g[bikeGroup_(b.category, b.wheelSize)] = 1;
+  });
+  return Object.keys(g).sort(groupSort_);
+}
+function stBikesHtml_() {
+  return st.groups.map(function(g, i){
+    var v = st.bikes[g];
+    return '<div class="stk"><div class="nm"><b>' + escH_(g) + '</b><small>' + (v === undefined || v === '' ? 'bikes' : v + (Number(v) === 1 ? ' bike' : ' bikes')) + '</small></div>' +
+      '<div class="step"><button class="quiet" onclick="stBStep_(' + i + ', -1)">\u2212</button>' +
+      '<input type="number" inputmode="numeric" min="0" id="st-b' + i + '" value="' + (v === undefined ? '' : v) + '" oninput="stBType_(' + i + ', this.value)">' +
+      '<button class="quiet" onclick="stBStep_(' + i + ', 1)">+</button></div></div>';
+  }).join('') || '<p class="note">No Bikes \u2019n Wines bikes on the Register yet.</p>';
+}
+function stBStep_(i, d) { var g = st.groups[i]; st.bikes[g] = Math.max(0, (Number(st.bikes[g]) || 0) + d); stPaint_(); }
+function stBType_(i, val) { st.bikes[st.groups[i]] = val === '' ? '' : Math.max(0, Math.floor(Number(val) || 0)); stReady_(); }
+function stRecount_() {
+  st.recount = true; st.bikes = {};
+  stPaint_();
+  show('view-stock');
+}
+function stResult_(res) {
+  var bad = res.groups.filter(function(g){ return g.diff; }), h = '';
+  h += res.balanced
+    ? '<div class="crhead ok">\u2713 Balances \u2014 ' + res.total + ' bikes at ' + escH_(res.site) + ' match the scans</div>'
+    : '<div class="crhead bad">\u2717 Doesn\u2019t balance with the scans</div>';
+  h += '<table class="crt"><tr><th>Bikes</th><th>Counted</th><th>Scans say</th><th></th></tr>' + res.groups.map(function(g){
+    return '<tr><td>' + escH_(g.group) + '</td><td>' + g.counted + '</td><td>' + g.expected + '</td><td class="' + (g.diff < 0 ? 'neg' : g.diff > 0 ? 'pos' : 'zero') + '">' +
+      (g.diff ? (g.diff > 0 ? '+' : '\u2212') + Math.abs(g.diff) : '\u2713') + '</td></tr>';
+  }).join('') + res.skipped.map(function(s){
+    return '<tr><td>' + escH_(s.group) + '</td><td>\u2014</td><td>' + s.expected + '</td><td class="neg">not counted</td></tr>';
+  }).join('') + '</table>';
+  if (res.onTour.length) h += '<p class="note" style="margin-top:10px">' + res.onTour.length + ' bike' + (res.onTour.length > 1 ? 's' : '') + ' from ' + escH_(res.site) +
+    ' still out on tour \u2014 not expected in this count: ' + res.onTour.map(function(b){ return escH_(b.aid) + (b.guide ? ' (' + escH_(b.guide) + ')' : ''); }).join(', ') + '</p>';
+  bad.forEach(function(g){
+    if (g.diff < 0) h += '<div class="crx"><b>' + escH_(g.group) + ': ' + (-g.diff) + ' not found.</b> The scans say these are here \u2014 look for them:<ul>' +
+      (g.here || []).map(function(b){ return '<li>' + escH_(b.aid) + ' <span class="note">' + escH_(STATUS_LABELS[b.status] || b.status) + '</span></li>'; }).join('') + '</ul></div>';
+    else h += '<div class="crx pos"><b>' + escH_(g.group) + ': ' + g.diff + ' more than the scans.</b> Probably not scanned back in. Could be:<ul>' +
+      ((g.maybe || []).map(function(b){ return '<li>' + escH_(b.aid) + ' <span class="note">' + escH_(b.where) + '</span></li>'; }).join('') || '<li>No match found</li>') +
+      '</ul>Scan them in with <b>Tour bikes</b> (back in) or <b>Move bikes</b>.</div>';
+  });
+  document.getElementById('cr-title').textContent = 'Bike count \u00b7 ' + res.site;
+  document.getElementById('cr-box').innerHTML = h;
+  document.getElementById('cr-re').style.display = res.balanced ? 'none' : '';
+  show('view-cntres');
+}
+
+/* ---- Red flag: open fault on a bike going out on tour (B59) ---- */
+var rfS = { code: '', why: '' };
+function rfOpen_(code, r) {
+  rfS = { code: code, why: '' };
+  document.getElementById('rf-bike').textContent = r.assetId;
+  renderFaults_('rf-list', (r.faults || []).map(function(f){ return { fault: escH_(f.fault) + (f.ride ? ' \u00b7 can ride: ' + escH_(f.ride) : ''), by: f.by, when: f.when, photo: f.photo }; }), false);
+  document.getElementById('rf-why').value = '';
+  rfState_();
+  show('view-redflag');
+  try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch(e) {}
+}
+function rfState_() { document.getElementById('rf-go').disabled = (document.getElementById('rf-why').value || '').trim().length < 3; }
+function rfCancel_() { rfS = { code: '', why: '' }; toast('Not taken \u2014 scan another bike'); goTour_(); }
+function rfGo_() {
+  var why = (document.getElementById('rf-why').value || '').trim();
+  if (why.length < 3) return;
+  rfS.why = why;
+  onCode(rfS.code);
 }
 
 /* ---- Faults & heads-ups quick view (B49) ---- */
@@ -2222,7 +2365,9 @@ function renderFlist_() {
   if (fl.who && !people[fl.who]) fl.who = '';
   pendChips_('fl-who', [['', 'Everyone']].concat(names.map(function(n){ return [n, n + ' (' + people[n] + ')']; })), fl.who,
     function(v){ fl.who = v; renderFlist_(); });
+  if (!canIride_()) fl.fleet = 'BnW';
   pendChips_('fl-fleet', [['All', 'All brands'], ['BnW', 'Bikes \u2019n Wines'], ['iRide', 'iRide']], fl.fleet || 'All', function(v){ fl.fleet = v; renderFlist_(); });
+  document.getElementById('fl-fleet').style.display = canIride_() ? '' : 'none';
   var list = all.filter(function(x){ return (fl.kind === 'all' || x.k === fl.kind) && (!fl.who || x.by === fl.who) &&
     (!fl.fleet || fl.fleet === 'All' || fleetOf_(x.b) === fl.fleet); });
   var today = isoDay_(new Date()), nToday = list.filter(function(x){ return isoDay_(new Date(x.when)) === today; }).length;
@@ -2244,7 +2389,7 @@ function renderFlist_() {
 /* ---- Bike forecast (B53) ---- */
 var FC = null, fcSite = 'All', fcSel = null;
 var FC_TYPES = { STD: 'STD bikes', E: 'E-bikes', Hybrid: 'Hybrids', Road: 'Road bikes' };
-var FC_SITE_ORDER = ['Stellenbosch', 'Franschhoek', 'Cape Town', 'Workshop'];
+var FC_SITE_ORDER = ['Stellenbosch', 'Franschhoek', 'Cape Town'];
 function fcDay_(iso) {
   var t = isoDay_(new Date()), tm = isoDay_(new Date(Date.now() + 864e5));
   return niceDay_(iso) + (iso === t ? ' \u00b7 today' : iso === tm ? ' \u00b7 tomorrow' : '');
@@ -2265,7 +2410,7 @@ function fcSupply_(site, type, date) {
       r.have++; if (back) r.due++;
       var z = b.frameSize || '?'; r.sizes[z] = (r.sizes[z] || 0) + 1;
     } else if (DOWN[b.status]) r.bench++;
-    else if (ok && b.location === 'Workshop' && site !== 'Workshop') r.spare++;
+    else if (ok && (b.location === 'Cape Town' || b.location === 'Workshop') && site !== 'Cape Town') r.spare++;
   });
   return r;
 }
@@ -2326,7 +2471,7 @@ function renderFc_() {
   FC.days.forEach(function(d){ fcSites_(d).forEach(function(s){ sites[s] = 1; }); });
   var list = FC_SITE_ORDER.filter(function(s){ return sites[s]; }).concat(Object.keys(sites).filter(function(s){ return FC_SITE_ORDER.indexOf(s) === -1; }));
   if (fcSite !== 'All' && !sites[fcSite]) fcSite = 'All';
-  pendChips_('fc-sites', [['All', 'All sites']].concat(list.map(function(s){ return [s, s === 'Workshop' ? 'Warehouse' : s]; })), fcSite,
+  pendChips_('fc-sites', [['All', 'All sites']].concat(list.map(function(s){ return [s, s === 'Workshop' ? 'Cape Town' : s]; })), fcSite,
     function(v){ fcSite = v; renderFc_(); });
   src.innerHTML = 'From the manifest \u00b7 ' + escH_(FC.updated) + ' \u00b7 next ' + FC.days.length + ' tour days \u00b7 ' +
     '<a href="#" onclick="fcLoad_(true);return false">refresh</a>' +
@@ -2335,7 +2480,7 @@ function renderFc_() {
   document.getElementById('fc-days').innerHTML = FC.days.map(function(d){
     var blocks = fcSites_(d).filter(function(s){ return fcSite === 'All' || s === fcSite; }).map(function(site){
       var S = d.sites[site];
-      return '<div class="fcsite" onclick="fcOpen_(\'' + d.date + '\', \'' + jsq_(site) + '\')"><div class="sn">' + escH_(site === 'Workshop' ? 'Warehouse (Workshop)' : site) + '</div>' +
+      return '<div class="fcsite" onclick="fcOpen_(\'' + d.date + '\', \'' + jsq_(site) + '\')"><div class="sn">' + escH_(site === 'Workshop' ? 'Cape Town' : site) + '</div>' +
         fcTypes_(d.date, site, S).map(function(ty){ return fcLine_(d.date, site, ty, S.types[ty]); }).join('') +
         (S.kids || S.seats ? '<div class="fcsub" style="margin-left:0">' + [S.kids ? S.kids + ' kids bike' + (S.kids > 1 ? 's' : '') : '', S.seats ? S.seats + ' child seat' + (S.seats > 1 ? 's' : '') + ' / tag-along' : ''].filter(Boolean).join(' \u00b7 ') + '</div>' : '') +
         '</div>';
@@ -2349,7 +2494,7 @@ function renderFcd_() {
   (FC.days || []).some(function(d){ if (d.date === fcSel.date) { day = d; return true; } });
   if (!day || !day.sites[fcSel.site]) { go('fc'); return; }
   var S = day.sites[fcSel.site], site = fcSel.site;
-  document.getElementById('fcd-title').textContent = fcDay_(day.date) + ' \u00b7 ' + (site === 'Workshop' ? 'Warehouse' : site);
+  document.getElementById('fcd-title').textContent = fcDay_(day.date) + ' \u00b7 ' + (site === 'Workshop' ? 'Cape Town' : site);
   var h = '';
   fcTypes_(day.date, site, S).forEach(function(ty){
     var t = S.types[ty], c = fcCalc_(day.date, site, ty, t), sizes = ['XS', 'S', 'M', 'L', 'XL'];
@@ -2436,9 +2581,10 @@ function paintClock_() {
       (t.state === 'Paused' ? '\u25b6 Resume' : '\u23f8 Pause') + '</button><button class="quiet" onclick="clockOp_(\'cancel\')">Started by mistake</button></div>' +
       '<label class="tq"><input type="checkbox" id="j-tq-on" onchange="paintTq_()"> Time is wrong (forgot to stop or pause)</label>' +
       '<input type="text" id="j-tq" placeholder="Note for Tim / Quintin \u2014 what really happened?" style="display:none;margin-top:6px" oninput="jobSaveState()"></div>';
-  } else if (b.status === 'Workshop' || b.status === 'Pending') {
+  } else if (b.status !== 'On tour' && b.status !== 'Retired') {
     h = '<button class="primary clockgo" onclick="clockOp_(\'start\')">\u25b6 Start job \u2014 clock on</button>' +
-      '<p class="note" style="margin:6px 0 0">Bikes on the bench are timed: tap when you start, Pause for breaks, then log the job when it\u2019s done.</p>';
+      '<p class="note" style="margin:6px 0 0">Tap when you start, Pause for breaks, then log the job when it\u2019s done.' +
+      (b.status !== 'Workshop' && b.status !== 'Guide bike' ? ' Starting puts the bike <b>On the bench</b>.' : '') + ' Quick job? Skip the clock and pick the minutes below.</p>';
   }
   if (others.length) h += '<p class="note">Also on the clock: ' + others.map(function(x){ return escH_(x.tech) + ' ' + hm_(clockMins_(x)); }).join(', ') + '</p>';
   box.innerHTML = h;
@@ -2535,7 +2681,7 @@ function vehOpen_(name) {
   vehList_().forEach(function(v){ if (v.name === name) vehSel = v; });
   if (!vehSel) return;
   var out = vehSel.status === 'Out', places = (DB.vehicles && DB.vehicles.places) || [];
-  vehPlace = out ? 'Warehouse' : ''; vehFuel = ''; vehFuelAdd = false; vehFuelOnly = false; photoBuf.fs = '';
+  vehPlace = out ? 'Cape Town' : ''; vehFuel = ''; vehFuelAdd = false; vehFuelOnly = false; photoBuf.fs = '';
   document.getElementById('veh-title').textContent = (out ? 'Check in \u2014 ' : 'Check out \u2014 ') + vehSel.name;
   document.getElementById('veh-list').style.display = 'none';
   var f = document.getElementById('veh-form');
@@ -2679,10 +2825,10 @@ function paintProgress_(html) {
   ['progress2', 'progress3'].forEach(function(id){ var el = document.getElementById(id); if (el) el.innerHTML = warn; });
 }
 var AREA_TILES = {
-  guide: ['tile-tour', 'tile-gdash', 'tile-fc', 'tile-stock', 'tile-move'],
+  guide: ['tile-tour', 'tile-gdash', 'tile-gflist', 'tile-fc', 'tile-stock', 'tile-move'],
   rent: ['sc-rent', 'sc-rentals', 'sc-ifleet'],
-  ws: ['tile-wq', 'tile-workshop', 'tile-wtasks', 'tile-hist', 'tile-inv', 'tile-order'],
-  office: ['tile-dash', 'tile-flist', 'of-rentals', 'tile-report', 'mg-fc', 'of-hist', 'of-inv', 'of-order', 'of-ipin', 'tile-assign']
+  ws: ['tile-wq', 'tile-wflist', 'tile-workshop', 'tile-wtasks', 'tile-hist', 'tile-inv', 'tile-order'],
+  office: ['tile-dash', 'tile-flist', 'of-rentals', 'tile-report', 'mg-fc', 'of-hist', 'of-inv', 'of-order', 'tile-assign']
 };
 var BNW_ONLY = { 'mg-fc': 1 }, IRIDE_ONLY = { 'of-rentals': 1 };
 function paintHome_() {
@@ -2918,7 +3064,7 @@ function unlockIride_(then) {
   if (p === null) return;
   IAUTH_CALL(p.trim(), function(r){
     if (r && r.ok) { ipin = p.trim(); try { localStorage.setItem('cab_ipin', ipin); } catch(e) {} toast('iRide unlocked'); then(); }
-    else toast(r && r.unset ? 'No iRide PIN set yet \u2014 the office sets it under Office / Admin' : 'Wrong iRide PIN', true);
+    else toast(r && r.unset ? 'No iRide PIN set yet \u2014 the office types it on the Settings tab of the sheet' : 'Wrong iRide PIN', true);
   }, function(){ toast('Could not check PIN \u2014 signal?', true); });
 }
 function setIpin_() {
@@ -3592,13 +3738,15 @@ function onCode(code) {
   } else if (mode === 'tour-out' || mode === 'tour-in') {
     var dir = mode === 'tour-out' ? 'out' : 'in';
     var cp = (tourConfirm === code); tourConfirm = '';
-    TOUR_CALL({ barcode: code, dir: dir, user: user, location: tourLoc, confirmPending: cp,
+    var fo = (rfS.code === code && rfS.why) ? rfS.why : ''; rfS = { code: '', why: '' };
+    TOUR_CALL({ barcode: code, dir: dir, user: user, location: tourLoc, confirmPending: cp, faultOk: fo,
       dueBack: (dir === 'out' && tourLoc === MULTI) ? multiBack : '',
       note: (dir === 'out' && tourLoc === MULTI) ? (document.getElementById('t-mname').value || '').trim() : '' }, function(r){
       if (!r || r.error || !r.assetId && !r.notFound && !r.blocked) {
         toast('Server is running old code \u2014 redeploy Code.gs (New version)', true); go('home'); return;
       }
       if (r.notFound) { toast('No bike carries ' + code + ' \u2014 assign it first', true); goTour_(); return; }
+      if (r.faultFlag) { rfOpen_(code, r); return; }
       if (r.blocked && r.rideable) {
         if (confirm(r.assetId + ' is on Pending check' + (r.fault ? ': ' + r.fault : '') + '.\n' +
                     'Marked rideable' + (r.by ? ' by ' + r.by : '') + '.\n\nTake it out on this tour?')) {
@@ -3829,7 +3977,6 @@ function chipRow(id, values, currentVal, onPick) {
 
 /* ---------- ops dashboard ---------- */
 var SITES = [
-  { name: 'Workshop', type: 'HOLDING' },
   { name: 'Cape Town', type: 'HOLDING' },
   { name: 'Stellenbosch', type: 'SELLING' },
   { name: 'Franschhoek', type: 'SELLING' }
@@ -4357,7 +4504,7 @@ function STOCKMV_CALL(p, ok, err) { apiPost({ action: 'stockmove', item: p.item,
 function PROBLEM_CALL(p, ok, err) { p.action = 'problem'; p.user = user; apiPost(p, ok, err); }
 function FORECAST_CALL(force, ok, err) { apiPost({ action: 'forecast', force: !!force, user: user }, ok, err); }
 function FCADJ_CALL(p, ok, err) { apiPost({ action: 'fcadjust', date: p.date, site: p.site, type: p.type, change: p.change, note: p.note, user: user }, ok, err); }
-function STOCK_CALL(p, ok, err) { apiPost({ action: 'stock', site: p.site, counts: p.counts, note: p.note, user: user }, ok, err); }
+function STOCK_CALL(p, ok, err) { apiPost({ action: 'stock', site: p.site, counts: p.counts, bikes: p.bikes, recount: p.recount, note: p.note, user: user }, ok, err); }
 function SETUP_CALL(p, ok, err) { apiPost({ action: 'setup', code: p.code, gears: p.gears, rings: p.rings, user: user, pin: pin }, ok, err); }
 function NOTE_CALL(p, ok, err) { apiPost({ action: 'clearnote', row: p.row, assetId: p.assetId, toFault: !!p.toFault, user: user, pin: pin }, ok, err); }
 
@@ -4712,7 +4859,7 @@ function renderReport(jobs) {
   document.getElementById('r-list').innerHTML = lh || '<p class="note">No jobs logged in this period.</p>';
 }
 /* ---------- general workshop task (no bike) ---------- */
-var GTASKS = ['Parts collection','Bike delivery','Bike movement','Marco Polo Tour','CPen Tour','Bites','On-site training (Warehouse)','On-site training (Stellenbosch)','Ops meeting','Errand','Other'];
+var GTASKS = ['Parts collection','Bike delivery','Bike movement','Marco Polo Tour','CPen Tour','Bites','On-site training (Cape Town)','On-site training (Stellenbosch)','Ops meeting','Errand','Other'];
 var gtask = { task: '', mins: '' };
 function openGtask_() {
   gtask = { task: '', mins: '' };
