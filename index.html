@@ -350,6 +350,18 @@
   .crx { margin-top:12px; padding:10px 12px; border-left:4px solid #D2141B; background:#FFF6F6; font-size:14px; }
   .crx.pos { border-color:#B87A0E; background:#FFF9EC; }
   .crx ul { margin:6px 0 0 18px; padding:0; }
+  table.dash td.szt { cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px; }
+  table.dash td.szt::after { content:' \25BE'; font-size:10px; color:var(--grey); }
+  table.dash tr.drop td { background:#FAFAFA; text-align:left; padding:8px 10px; font-weight:400; }
+  .ddh { font-family:'Montserrat',sans-serif; font-weight:800; font-size:13px; margin-bottom:4px; }
+  .ddh .x { float:right; color:var(--grey); cursor:pointer; font-size:16px; line-height:1; }
+  .dds { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--grey); margin:8px 0 2px; }
+  .ddi { padding:7px 0; border-bottom:1px solid var(--line); cursor:pointer; font-size:14px; }
+  .ddi:last-child { border-bottom:0; }
+  .ddi .nm { color:#333; }
+  .ddi .st { float:right; font-size:11px; font-weight:700; padding:2px 7px; border-radius:10px; background:#EEE; color:#555; }
+  .ddi .st.ok { background:#E9F5EC; color:#1B7A3D; } .ddi .st.out { background:#E8F0FB; color:#1D5FBF; } .ddi .st.dn { background:#FDECEC; color:#D2141B; }
+  .ddi .meta { font-size:12px; color:var(--grey); }
 </style>
 </head>
 <body>
@@ -672,7 +684,7 @@
 
     <h2>What&rsquo;s where, by size</h2>
     <div class="chips" id="d-filters"></div>
-    <p class="note">Big number = ready to ride. Red = nothing at a selling site. Amber = down to one. Tap a cell for the bikes.</p>
+    <p class="note">Big number = ready to ride. Red = nothing at a selling site. Amber = down to one. <b>Tap a size</b> for the bike names at every site, or a number for one site.</p>
     <div id="d-matrix" style="overflow-x:auto"></div>
     <div id="d-celllist"></div>
 
@@ -1092,7 +1104,7 @@
 
 <script>
 /* ======== PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES ======== */
-var EXEC_URL = 'https://script.google.com/macros/s/AKfycbyJzIGAlR_6cNm9Jaa2mZgBnzQy-O4FaudBMOF4S5hk6e0Nq3CvDIEpzuurJZsaeiB-/exec';
+var EXEC_URL = 'https://script.google.com/macros/s/AKfycbyJnVzWaC0YtUeUrGt_fWIphKVfz0SM6NDvylwTcFODJ8dZHpUkTBgQAkutkIJrujkJ/exec';
 /* ===================================================================== */
 
 function apiGet(cb, err) {
@@ -1105,7 +1117,7 @@ function apiPost(payload, cb, err) {
 }
 
 var DB = { bikes: [], locations: [], statuses: [], people: [] };
-var UI_VERSION = 'B59';
+var UI_VERSION = 'B60';
 var user = localStorage.getItem('cab_user') || '';
 var role = localStorage.getItem('cab_role') || 'guide';
 var pin  = localStorage.getItem('cab_pin') || '';
@@ -3981,6 +3993,7 @@ var SITES = [
   { name: 'Stellenbosch', type: 'SELLING' },
   { name: 'Franschhoek', type: 'SELLING' }
 ];
+var ALL_SITES = SITES, dashSiteList = SITES;
 var dashFilter = 'All';
 var STATUS_COLORS = { 'Available':'#1B7A3D', 'On tour':'#1D5FBF', 'Workshop':'#B87A0E', 'Waiting for parts':'#D9A93C', 'Pending':'#6E4A9E', 'Out of Service':'#D2141B', 'Retired':'#555555', 'Guide bike':'#0F6E56', 'Other':'#888888' };
 var STATUS_LABELS = { 'Available':'Ready to ride', 'On tour':'On tour', 'Workshop':'On the bench', 'Waiting for parts':'Waiting for parts', 'Pending':'Pending check', 'Out of Service':'Long-term down', 'Retired':'Retired', 'Guide bike':'Guide bike', 'Other':'Other' };
@@ -4122,6 +4135,13 @@ function renderDash() {
   var sizes = [];
   pool.forEach(function(b){ var s = bucketSize_(b); if (sizes.indexOf(s) === -1) sizes.push(s); });
   sizes.sort(function(a,b){ return sizeOrder_(a) - sizeOrder_(b); });
+  dashPool = pool; dashSizes = sizes; dashOpen = '';
+  /* iRide rents from the warehouse: only show sites that hold iRide bikes, no red/amber, no move suggestions */
+  var SITES = dashFleet === 'iRide'
+    ? ALL_SITES.filter(function(s){ return bikes.some(function(b){ return b.location === s.name; }); }).map(function(s){ return { name: s.name, type: '' }; })
+    : ALL_SITES;
+  if (!SITES.length) SITES = [{ name: 'Cape Town', type: '' }];
+  dashSiteList = SITES;
 
   function cellBikes(size, site) {
     return pool.filter(function(b){ return bucketSize_(b) === size && b.location === site; });
@@ -4130,7 +4150,7 @@ function renderDash() {
   SITES.forEach(function(s){ html += '<th>' + s.name + '<small>' + s.type + '</small></th>'; });
   html += '<th>Total</th></tr>';
   var readyCol = {};
-  sizes.forEach(function(size){
+  sizes.forEach(function(size, si){
     var rowTotal = 0;
     var cells = '';
     SITES.forEach(function(site){
@@ -4144,11 +4164,11 @@ function renderDash() {
       if (site.type === 'SELLING') {
         if (r === 0) cls = 'bad'; else if (r === 1) cls = 'warn';
       }
-      cells += '<td class="' + cls + '" onclick="showCell(\'' + size.replace(/'/g,"\\'") + '\',\'' + site.name + '\')">' + r +
+      cells += '<td class="' + cls + '" onclick="showCell(dashSizes[' + si + '],\'' + jsq_(site.name) + '\')">' + r +
                (tourN ? '<span class="down">' + tourN + ' on tour</span>' : '') +
                (down ? '<span class="down">' + down + ' down</span>' : '') + '</td>';
     });
-    html += '<tr><td>' + size + '</td>' + cells + '<td><b>' + rowTotal + '</b></td></tr>';
+    html += '<tr id="d-row-' + si + '"><td class="szt" onclick="showSize_(' + si + ')">' + escH_(size) + '</td>' + cells + '<td><b>' + rowTotal + '</b></td></tr>';
   });
   html += '<tr class="total"><td>READY</td>';
   var readyShown = 0;
@@ -4176,7 +4196,7 @@ function renderDash() {
       }
     });
   });
-  document.getElementById('d-gaps').innerHTML = gaps || '<p class="note">No stock gaps at selling sites right now.</p>';
+  document.getElementById('d-gaps').innerHTML = gaps || '<p class="note">' + (dashFleet === 'iRide' ? 'iRide rents from the warehouse \u2014 no site gaps to move.' : 'No stock gaps at selling sites right now.') + '</p>';
 
   /* bikes down */
   var DOWN_ORDER = ['Pending', 'Workshop', 'Waiting for parts', 'Out of Service'];
@@ -4299,18 +4319,54 @@ function renderDash() {
   document.getElementById('dash-note').textContent = bits.join(' \u00b7 ');
 }
 
+/* ---- Dashboard drop-down: tap a size (all sites) or a cell (one site) for the bike names (B60) ---- */
+var dashPool = [], dashSizes = [], dashOpen = '';
+function bikeName_(b) {
+  var n = String(b.bikeNumber || '').trim();
+  return [n && n !== b.assetId ? n : '', b.brand].filter(Boolean).join(' \u00b7 ');
+}
+function ddItem_(b) {
+  var st = b.status, cls = st === 'Available' ? 'ok' : st === 'On tour' ? 'out' : 'dn';
+  var lbl = fleetOf_(b) === 'iRide' && st === 'On tour' ? 'On rental' : (STATUS_LABELS[st] || st || '?');
+  var nm = bikeName_(b);
+  return '<div class="ddi" onclick="openBikeByBarcode(\'' + jsq_(b.barcode || b.assetId) + '\',\'dash\')"><span class="st ' + cls + '">' + escH_(lbl) + '</span>' +
+    '<b>' + escH_(b.assetId) + '</b>' + (nm ? ' <span class="nm">' + escH_(nm) + '</span>' : '') +
+    '<div class="meta">' + escH_([b.category, b.frameSize, b.wheelSize, b.colour].filter(Boolean).join(' \u00b7 ')) + '</div>' + faultLine_(b.assetId) + '</div>';
+}
+function ddSort_(a, b) {
+  var o = { 'Available': 0, 'On tour': 1 }, x = (o[a.status] == null ? 2 : o[a.status]) - (o[b.status] == null ? 2 : o[b.status]);
+  return x || String(a.assetId).localeCompare(String(b.assetId), undefined, { numeric: true });
+}
+function showSize_(i) { showCell(dashSizes[i], ''); }
 function showCell(size, site) {
-  var pool = activeBikes_().filter(function(b){
-    return (dashFilter === 'All' || bucketCat_(b) === dashFilter) &&
-           bucketSize_(b) === size && b.location === site;
-  });
-  var html = '<h2>' + size + ' at ' + site + '</h2>';
-  if (!pool.length) html += '<p class="note">Nothing here.</p>';
-  pool.forEach(function(b){
-    html += '<div class="move" style="cursor:pointer" onclick="openBikeByBarcode(\'' + (b.barcode || '') + '\',\'dash\')"><b>' + b.assetId + '</b><div class="meta">' +
-            [b.category, b.brand, b.colour, b.status].filter(Boolean).join(' \u00b7 ') + '</div>' + faultLine_(b.assetId) + '</div>';
-  });
-  document.getElementById('d-celllist').innerHTML = html;
+  var key = size + '|' + (site || ''), i = dashSizes.indexOf(size);
+  var old = document.getElementById('d-drop');
+  if (old && old.parentNode) old.parentNode.removeChild(old);
+  document.getElementById('d-celllist').innerHTML = '';
+  if (dashOpen === key) { dashOpen = ''; return; }
+  dashOpen = key;
+  var list = dashPool.filter(function(b){ return bucketSize_(b) === size && (!site || b.location === site); }).sort(ddSort_);
+  var ready = list.filter(function(b){ return b.status === 'Available'; }).length;
+  var h = '<div class="ddh"><span class="x" onclick="dashOpen=\'' + jsq_(key) + '\';showCell(\'' + jsq_(size) + '\',\'' + jsq_(site || '') + '\')">&times;</span>' +
+    escH_(size) + ' \u00b7 ' + escH_(site || 'all sites') + ' \u2014 ' + list.length + ' bike' + (list.length === 1 ? '' : 's') + ' (' + ready + ' ready)</div>';
+  if (!list.length) h += '<p class="note">Nothing here.</p>';
+  else if (site) h += list.map(ddItem_).join('');
+  else {
+    var by = {};
+    list.forEach(function(b){ (by[b.location || '?'] = by[b.location || '?'] || []).push(b); });
+    var order = dashSiteList.map(function(s){ return s.name; });
+    Object.keys(by).sort(function(a, b){ var x = order.indexOf(a), y = order.indexOf(b); return (x === -1 ? 99 : x) - (y === -1 ? 99 : y); })
+      .forEach(function(loc){ h += '<div class="dds">' + escH_(loc) + ' \u00b7 ' + by[loc].length + '</div>' + by[loc].map(ddItem_).join(''); });
+  }
+  var row = i === -1 ? null : document.getElementById('d-row-' + i);
+  if (row && row.parentNode && row.parentNode.insertBefore) {
+    var tr = document.createElement('tr');
+    tr.id = 'd-drop'; tr.className = 'drop';
+    tr.innerHTML = '<td colspan="' + (dashSiteList.length + 2) + '">' + h + '</td>';
+    row.parentNode.insertBefore(tr, row.nextSibling);
+  } else {
+    document.getElementById('d-celllist').innerHTML = h;
+  }
 }
 
 function refreshDash() {
